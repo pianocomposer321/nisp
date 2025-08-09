@@ -74,6 +74,10 @@ impl Lexer {
         }
 
         let ch = self.get_char()?;
+        if ch == ';' {
+            self.advance_until(|c| c == '\n');
+            self.advance();
+        }
         if ch == '(' {
             self.advance();
             return Ok(Token::OpenParen);
@@ -373,6 +377,17 @@ mod test {
         assert_next_token_eq!(&mut l, Token::Symbol("+".to_string()));
         assert_next_token_eq!(&mut l, Token::IntLiteral(123));
         assert_next_token_eq!(&mut l, Token::IntLiteral(456));
+        assert_next_token_eq!(&mut l, Token::CloseParen);
+
+        Ok(())
+    }
+
+    #[test]
+    fn lex_comment() -> LexingResult<()> {
+        let mut l = lex("(; comment\nprint \"hello, world\")");
+        assert_next_token_eq!(&mut l, Token::OpenParen);
+        assert_next_token_eq!(&mut l, Token::Symbol("print".to_string()));
+        assert_next_token_eq!(&mut l, Token::StringLiteral("hello, world".to_string()));
         assert_next_token_eq!(&mut l, Token::CloseParen);
 
         Ok(())
