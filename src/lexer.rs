@@ -1,0 +1,380 @@
+use std::path::Path;
+use std::{fs, io};
+
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum LexingError {
+    #[error("Unexpected End Of File while lexing")]
+    EOF,
+    #[error("Unexpected token: expected {expected:?} but got {got:?}")]
+    UnexpectedToken {
+        position: usize,
+        expected: Token,
+        got: Token,
+    },
+    #[error("Unable to parse integer")]
+    ParseIntError(#[from] std::num::ParseIntError),
+    #[error(transparent)]
+    IOError(#[from] std::io::Error),
+}
+
+type LexingResult<T> = Result<T, LexingError>;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Token {
+    /// (
+    OpenParen,
+    /// )
+    CloseParen,
+    /// [
+    OpenBracket,
+    /// ]
+    CloseBracket,
+    /// {
+    OpenBrace,
+    /// }
+    CloseBrace,
+    /// symbol
+    Symbol(String),
+    /// 123
+    IntLiteral(i64),
+    /// "string"
+    StringLiteral(String),
+}
+
+#[derive(Debug)]
+pub struct Lexer {
+    input: Vec<char>,
+    position: usize,
+}
+
+#[allow(dead_code)]
+impl Lexer {
+    pub fn new(input: Vec<char>) -> Self {
+        Self { input, position: 0 }
+    }
+
+    pub fn from_string(input: impl Into<String>) -> Self {
+        let input: String = input.into();
+        let input: Vec<char> = input.chars().collect();
+        Self { input, position: 0 }
+    }
+
+    pub fn from_file(filename: impl AsRef<Path>) -> io::Result<Self> {
+        let contents = fs::read_to_string(filename)?;
+        let input: Vec<char> = contents.chars().collect();
+
+        Ok(Self { input, position: 0 })
+    }
+
+    pub fn get_next_token(&mut self) -> LexingResult<Token> {
+        while self.get_char()?.is_whitespace() {
+            self.advance();
+        }
+
+        let ch = self.get_char()?;
+        if ch == '(' {
+            self.advance();
+            return Ok(Token::OpenParen);
+        }
+        if ch == ')' {
+            self.advance();
+            return Ok(Token::CloseParen);
+        }
+        if ch == '[' {
+            self.advance();
+            return Ok(Token::OpenBracket);
+        }
+        if ch == ']' {
+            self.advance();
+            return Ok(Token::CloseBracket);
+        }
+        if matches!(ch, '0'..'9') {
+            let number: String = self.get_slice_until_or_end(|c| !matches!(c, '0'..'9')).iter().collect();
+            self.advance_by(number.len());
+            return Ok(Token::IntLiteral(number.parse()?));
+        }
+        if matches!(ch, '"') {
+            self.advance();
+            let string: String = self.get_slice_until(|c| c == '"')?.iter().collect();
+            self.advance_by(string.len());
+            self.advance();
+            return Ok(Token::StringLiteral(string));
+        }
+
+        // Assume anything else is a symbol
+        let symbol: String = self
+            .get_slice_until_or_end(|c| c.is_whitespace() || matches!(c, ')' | ']' | '}'))
+            .iter()
+            .collect();
+        self.advance_by(symbol.len());
+        Ok(Token::Symbol(symbol))
+    }
+
+    // pub fn iter(&mut self) -> TokenIter {
+    //     TokenIter(self)
+    // }
+
+    pub fn input_to_string(&self) -> String {
+        self.input
+            .iter()
+            .map(|ch| if *ch == '\n' { ' ' } else { *ch })
+            .collect::<String>()
+    }
+
+    pub fn print_status(&self) {
+        self.print_pointer(self.position);
+    }
+
+    pub fn print_pointer(&self, pointer: usize) {
+        let output = self.input_to_string();
+        println!("{output}");
+        for _ in 0..pointer {
+            print!(" ");
+        }
+        println!("^");
+    }
+
+    fn get_slice(&self, offset: usize) -> LexingResult<&[char]> {
+        self.get_slice_at(0, offset)
+    }
+
+    fn get_slice_until(&self, pred: impl Fn(char) -> bool) -> LexingResult<&[char]> {
+        self.get_slice(self.find(pred)? - 1)
+    }
+
+    fn get_slice_until_or_end(&self, pred: impl Fn(char) -> bool) -> &[char] {
+        // Safe to unwrap because find_or_end always returns an in-bounds index
+        self.get_slice(self.find_or_end(pred) - 1).unwrap()
+    }
+
+    /// Returns the offset of the first char for which pred(char) is true, starting at
+    /// self.position + offset
+    fn find_at(&self, mut offset: usize, pred: impl Fn(char) -> bool) -> Option<usize> {
+        while !pred(self.get_char_at(offset).ok()?) {
+            offset += 1;
+        }
+        Some(offset)
+    }
+
+    /// Returns the offset of the first char for which pred(char) is true
+    fn find(&self, pred: impl Fn(char) -> bool) -> LexingResult<usize> {
+        let mut offset = 0;
+        while !pred(self.get_char_at(offset)?) {
+            offset += 1;
+        }
+        Ok(offset)
+    }
+
+    /// Returns the offset of the first char for which pred(char) is true, or the offset that is
+    /// one past the end of self.input.
+    fn find_or_end(&self, pred: impl Fn(char) -> bool) -> usize {
+        self.find(pred).unwrap_or(self.offset_to_end())
+    }
+
+    fn find_or_end_at(&self, offset: usize, pred: impl Fn(char) -> bool) -> usize {
+        self.find_at(offset, pred).unwrap_or(self.offset_to_end())
+    }
+
+    fn get_slice_at(&self, smaller: usize, larger: usize) -> LexingResult<&[char]> {
+        if self.position + larger >= self.input_len() {
+            Err(LexingError::EOF)
+        } else {
+            Ok(&self.input[self.position + smaller..=self.position + larger])
+        }
+    }
+
+    fn get_char(&self) -> LexingResult<char> {
+        self.get_char_at(0)
+    }
+
+    fn get_char_at(&self, offset: usize) -> LexingResult<char> {
+        if self.position + offset >= self.input_len() {
+            Err(LexingError::EOF)
+        } else {
+            Ok(self.input[self.position + offset])
+        }
+    }
+
+    fn input_len(&self) -> usize {
+        self.input.len()
+    }
+
+    fn offset_to_end(&self) -> usize {
+        self.input_len() - self.position
+    }
+
+    fn advance(&mut self) {
+        self.position += 1;
+    }
+
+    fn advance_by(&mut self, offset: usize) {
+        self.position += offset;
+    }
+
+    fn advance_until(&mut self, pred: impl Fn(char) -> bool) {
+        let mut ch = match self.get_char() {
+            Ok(ch) => ch,
+            Err(_) => return,
+        };
+        while !pred(ch) {
+            self.advance();
+            ch = match self.get_char() {
+                Ok(ch) => ch,
+                Err(_) => return,
+            };
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    macro_rules! assert_next_token_eq {
+        ($lexer:expr, $value:expr) => {
+            let token = $lexer.get_next_token().unwrap();
+            assert_eq!(token, $value);
+            // assert_eq!($lexer.get_next_token(), Ok($value))
+        };
+    }
+
+    fn lex(s: &str) -> Lexer {
+        Lexer::from_string(s)
+    }
+
+    #[test]
+    fn lex_empty_parens() -> LexingResult<()> {
+        let mut l = lex("()");
+        assert_next_token_eq!(&mut l, Token::OpenParen);
+        assert_next_token_eq!(&mut l, Token::CloseParen);
+
+        Ok(())
+    }
+
+    #[test]
+    fn lex_int() -> LexingResult<()> {
+        let mut l = lex("123");
+        assert_next_token_eq!(&mut l, Token::IntLiteral(123));
+
+        Ok(())
+    }
+
+    #[test]
+    fn lex_single_expression() -> LexingResult<()> {
+        let mut l = lex("(expr)");
+        assert_next_token_eq!(&mut l, Token::OpenParen);
+        assert_next_token_eq!(&mut l, Token::Symbol("expr".to_string()));
+        assert_next_token_eq!(&mut l, Token::CloseParen);
+
+        Ok(())
+    }
+
+    #[test]
+    fn lex_multiple_expression() -> LexingResult<()> {
+        let mut l = lex("(+ 1 2)");
+        assert_next_token_eq!(&mut l, Token::OpenParen);
+        assert_next_token_eq!(&mut l, Token::Symbol("+".to_string()));
+        assert_next_token_eq!(&mut l, Token::IntLiteral(1));
+        assert_next_token_eq!(&mut l, Token::IntLiteral(2));
+        assert_next_token_eq!(&mut l, Token::CloseParen);
+
+        Ok(())
+    }
+
+    #[test]
+    fn lex_multiple_expression_with_whitespace() -> LexingResult<()> {
+        let mut l = lex("( + 1 2 )");
+        assert_next_token_eq!(&mut l, Token::OpenParen);
+        assert_next_token_eq!(&mut l, Token::Symbol("+".to_string()));
+        assert_next_token_eq!(&mut l, Token::IntLiteral(1));
+        assert_next_token_eq!(&mut l, Token::IntLiteral(2));
+        assert_next_token_eq!(&mut l, Token::CloseParen);
+
+        Ok(())
+    }
+
+    #[test]
+    fn lex_empty_list() -> LexingResult<()> {
+        let mut l = lex("[]");
+        assert_next_token_eq!(&mut l, Token::OpenBracket);
+        assert_next_token_eq!(&mut l, Token::CloseBracket);
+
+        Ok(())
+    }
+
+    #[test]
+    fn lex_single_list() -> LexingResult<()> {
+        let mut l = lex("[1]");
+        assert_next_token_eq!(&mut l, Token::OpenBracket);
+        assert_next_token_eq!(&mut l, Token::IntLiteral(1));
+        assert_next_token_eq!(&mut l, Token::CloseBracket);
+
+        Ok(())
+    }
+
+    #[test]
+    fn lex_multiple_list() -> LexingResult<()> {
+        let mut l = lex("[1 2 3]");
+        assert_next_token_eq!(&mut l, Token::OpenBracket);
+        assert_next_token_eq!(&mut l, Token::IntLiteral(1));
+        assert_next_token_eq!(&mut l, Token::IntLiteral(2));
+        assert_next_token_eq!(&mut l, Token::IntLiteral(3));
+        assert_next_token_eq!(&mut l, Token::CloseBracket);
+
+        Ok(())
+    }
+
+    #[test]
+    fn lex_multiple_list_with_whitespace() -> LexingResult<()> {
+        let mut l = lex("[ 1 2 3 ]");
+        assert_next_token_eq!(&mut l, Token::OpenBracket);
+        assert_next_token_eq!(&mut l, Token::IntLiteral(1));
+        assert_next_token_eq!(&mut l, Token::IntLiteral(2));
+        assert_next_token_eq!(&mut l, Token::IntLiteral(3));
+        assert_next_token_eq!(&mut l, Token::CloseBracket);
+
+        Ok(())
+    }
+
+    #[test]
+    fn lex_complex_expression() -> LexingResult<()> {
+        let mut l = lex("(+ 1 (* 2 3))");
+        assert_next_token_eq!(&mut l, Token::OpenParen);
+        assert_next_token_eq!(&mut l, Token::Symbol("+".to_string()));
+        assert_next_token_eq!(&mut l, Token::IntLiteral(1));
+        assert_next_token_eq!(&mut l, Token::OpenParen);
+        assert_next_token_eq!(&mut l, Token::Symbol("*".to_string()));
+        assert_next_token_eq!(&mut l, Token::IntLiteral(2));
+        assert_next_token_eq!(&mut l, Token::IntLiteral(3));
+        assert_next_token_eq!(&mut l, Token::CloseParen);
+        assert_next_token_eq!(&mut l, Token::CloseParen);
+
+        Ok(())
+    }
+
+    #[test]
+    fn lex_string() -> LexingResult<()> {
+        let mut l = lex("\"hello, world\"");
+        assert_next_token_eq!(&mut l, Token::StringLiteral("hello, world".to_string()));
+
+        Ok(())
+    }
+
+    #[test]
+    fn lex_file() -> LexingResult<()> {
+        let mut l = Lexer::from_file("input.nisp")?;
+        assert_next_token_eq!(&mut l, Token::OpenParen);
+        assert_next_token_eq!(&mut l, Token::Symbol("print".to_string()));
+        assert_next_token_eq!(&mut l, Token::StringLiteral("hello, world".to_string()));
+        assert_next_token_eq!(&mut l, Token::CloseParen);
+        assert_next_token_eq!(&mut l, Token::OpenParen);
+        assert_next_token_eq!(&mut l, Token::Symbol("+".to_string()));
+        assert_next_token_eq!(&mut l, Token::IntLiteral(123));
+        assert_next_token_eq!(&mut l, Token::IntLiteral(456));
+        assert_next_token_eq!(&mut l, Token::CloseParen);
+
+        Ok(())
+    }
+}
