@@ -6,6 +6,8 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum LexingError {
     #[error("Unexpected End Of File while lexing")]
+    EOL,
+    #[error("Unexpected End Of File while lexing")]
     EOF,
     #[error("Unexpected token: expected {expected:?} but got {got:?}")]
     UnexpectedToken {
@@ -43,29 +45,40 @@ pub enum Token {
     StringLiteral(String),
 }
 
+pub struct TokenIter<'a>(&'a mut Lexer);
+
+impl<'a> Iterator for TokenIter<'a> {
+    type Item = Token;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.get_next_token().ok()
+    }
+}
+
 #[derive(Debug)]
 pub struct Lexer {
-    input: Vec<char>,
-    position: usize,
+    input: Vec<Vec<char>>,
+    line: usize,
+    col: usize,
 }
 
 #[allow(dead_code)]
 impl Lexer {
-    pub fn new(input: Vec<char>) -> Self {
-        Self { input, position: 0 }
+    pub fn new(input: Vec<String>) -> Self {
+        Self { input: input.iter().map(|s| s.chars().collect()).collect(), line: 0, col: 0 }
     }
 
     pub fn from_string(input: impl Into<String>) -> Self {
         let input: String = input.into();
-        let input: Vec<char> = input.chars().collect();
-        Self { input, position: 0 }
+        let input: Vec<Vec<char>> = input.lines().map(|s| s.chars().collect()).collect();
+        Self { input, line: 0, col: 0 }
     }
 
     pub fn from_file(filename: impl AsRef<Path>) -> io::Result<Self> {
         let contents = fs::read_to_string(filename)?;
-        let input: Vec<char> = contents.chars().collect();
+        let input: Vec<Vec<char>> = contents.lines().map(|s| s.chars().collect()).collect();
 
-        Ok(Self { input, position: 0 })
+        Ok(Self { input, line: 0, col: 0 })
     }
 
     pub fn get_next_token(&mut self) -> LexingResult<Token> {
@@ -75,8 +88,7 @@ impl Lexer {
 
         let ch = self.get_char()?;
         if ch == ';' {
-            self.advance_until(|c| c == '\n');
-            self.advance();
+            self.advance_line();
         }
         if ch == '(' {
             self.advance();
@@ -116,28 +128,8 @@ impl Lexer {
         Ok(Token::Symbol(symbol))
     }
 
-    // pub fn iter(&mut self) -> TokenIter {
-    //     TokenIter(self)
-    // }
-
-    pub fn input_to_string(&self) -> String {
-        self.input
-            .iter()
-            .map(|ch| if *ch == '\n' { ' ' } else { *ch })
-            .collect::<String>()
-    }
-
-    pub fn print_status(&self) {
-        self.print_pointer(self.position);
-    }
-
-    pub fn print_pointer(&self, pointer: usize) {
-        let output = self.input_to_string();
-        println!("{output}");
-        for _ in 0..pointer {
-            print!(" ");
-        }
-        println!("^");
+    pub fn iter(&mut self) -> TokenIter {
+        TokenIter(self)
     }
 
     fn get_slice(&self, offset: usize) -> LexingResult<&[char]> {
@@ -182,11 +174,15 @@ impl Lexer {
     }
 
     fn get_slice_at(&self, smaller: usize, larger: usize) -> LexingResult<&[char]> {
-        if self.position + larger >= self.input_len() {
+        if self.col + larger >= self.get_line().len() {
             Err(LexingError::EOF)
         } else {
-            Ok(&self.input[self.position + smaller..=self.position + larger])
+            Ok(&self.input[self.line][self.col + smaller..=self.col + larger])
         }
+    }
+
+    fn get_line(&self) -> &[char] {
+        &self.input[self.line]
     }
 
     fn get_char(&self) -> LexingResult<char> {
@@ -194,27 +190,45 @@ impl Lexer {
     }
 
     fn get_char_at(&self, offset: usize) -> LexingResult<char> {
-        if self.position + offset >= self.input_len() {
+        if self.line >= self.lines() {
+            return Err(LexingError::EOF);
+        }
+
+        if self.col + offset >= self.get_line().len() {
             Err(LexingError::EOF)
         } else {
-            Ok(self.input[self.position + offset])
+            Ok(self.input[self.line][self.col + offset])
         }
     }
 
-    fn input_len(&self) -> usize {
+    fn lines(&self) -> usize {
         self.input.len()
     }
 
     fn offset_to_end(&self) -> usize {
-        self.input_len() - self.position
+        self.get_line().len() - self.col
     }
 
     fn advance(&mut self) {
-        self.position += 1;
+        self.col += 1;
+        if self.col >= self.get_line().len() {
+            self.col = 0;
+            self.line += 1;
+        }
+    }
+
+    fn advance_line(&mut self) {
+        self.line += 1;
+        self.col = 0;
     }
 
     fn advance_by(&mut self, offset: usize) {
-        self.position += offset;
+        self.col += offset;
+        if self.col >= self.get_line().len() {
+            let diff = self.col - self.get_line().len();
+            self.line += 1;
+            self.col = diff;
+        }
     }
 
     fn advance_until(&mut self, pred: impl Fn(char) -> bool) {
