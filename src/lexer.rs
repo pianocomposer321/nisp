@@ -244,6 +244,12 @@ mod test {
         };
     }
 
+    macro_rules! assert_eof {
+        ($lexer:expr) => {
+            assert!(matches!($lexer.get_next_token(), Err(LexingError::EOF)));
+        };
+    }
+
     fn lex(s: &str) -> Lexer {
         Lexer::from_string(s)
     }
@@ -253,6 +259,7 @@ mod test {
         let mut l = lex("()");
         assert_next_token_eq!(&mut l, Token::OpenParen);
         assert_next_token_eq!(&mut l, Token::CloseParen);
+        assert_eof!(&mut l);
 
         Ok(())
     }
@@ -261,6 +268,7 @@ mod test {
     fn lex_int() -> LexingResult<()> {
         let mut l = lex("123");
         assert_next_token_eq!(&mut l, Token::IntLiteral(123));
+        assert_eof!(&mut l);
 
         Ok(())
     }
@@ -271,6 +279,7 @@ mod test {
         assert_next_token_eq!(&mut l, Token::OpenParen);
         assert_next_token_eq!(&mut l, Token::Symbol("expr".to_string()));
         assert_next_token_eq!(&mut l, Token::CloseParen);
+        assert_eof!(&mut l);
 
         Ok(())
     }
@@ -283,6 +292,7 @@ mod test {
         assert_next_token_eq!(&mut l, Token::IntLiteral(1));
         assert_next_token_eq!(&mut l, Token::IntLiteral(2));
         assert_next_token_eq!(&mut l, Token::CloseParen);
+        assert_eof!(&mut l);
 
         Ok(())
     }
@@ -295,6 +305,7 @@ mod test {
         assert_next_token_eq!(&mut l, Token::IntLiteral(1));
         assert_next_token_eq!(&mut l, Token::IntLiteral(2));
         assert_next_token_eq!(&mut l, Token::CloseParen);
+        assert_eof!(&mut l);
 
         Ok(())
     }
@@ -304,6 +315,7 @@ mod test {
         let mut l = lex("[]");
         assert_next_token_eq!(&mut l, Token::OpenBracket);
         assert_next_token_eq!(&mut l, Token::CloseBracket);
+        assert_eof!(&mut l);
 
         Ok(())
     }
@@ -314,6 +326,7 @@ mod test {
         assert_next_token_eq!(&mut l, Token::OpenBracket);
         assert_next_token_eq!(&mut l, Token::IntLiteral(1));
         assert_next_token_eq!(&mut l, Token::CloseBracket);
+        assert_eof!(&mut l);
 
         Ok(())
     }
@@ -326,6 +339,7 @@ mod test {
         assert_next_token_eq!(&mut l, Token::IntLiteral(2));
         assert_next_token_eq!(&mut l, Token::IntLiteral(3));
         assert_next_token_eq!(&mut l, Token::CloseBracket);
+        assert_eof!(&mut l);
 
         Ok(())
     }
@@ -338,6 +352,7 @@ mod test {
         assert_next_token_eq!(&mut l, Token::IntLiteral(2));
         assert_next_token_eq!(&mut l, Token::IntLiteral(3));
         assert_next_token_eq!(&mut l, Token::CloseBracket);
+        assert_eof!(&mut l);
 
         Ok(())
     }
@@ -354,6 +369,7 @@ mod test {
         assert_next_token_eq!(&mut l, Token::IntLiteral(3));
         assert_next_token_eq!(&mut l, Token::CloseParen);
         assert_next_token_eq!(&mut l, Token::CloseParen);
+        assert_eof!(&mut l);
 
         Ok(())
     }
@@ -362,6 +378,7 @@ mod test {
     fn lex_string() -> LexingResult<()> {
         let mut l = lex("\"hello, world\"");
         assert_next_token_eq!(&mut l, Token::StringLiteral("hello, world".to_string()));
+        assert_eof!(&mut l);
 
         Ok(())
     }
@@ -378,6 +395,7 @@ mod test {
         assert_next_token_eq!(&mut l, Token::IntLiteral(123));
         assert_next_token_eq!(&mut l, Token::IntLiteral(456));
         assert_next_token_eq!(&mut l, Token::CloseParen);
+        assert_eof!(&mut l);
 
         Ok(())
     }
@@ -389,6 +407,7 @@ mod test {
         assert_next_token_eq!(&mut l, Token::Symbol("print".to_string()));
         assert_next_token_eq!(&mut l, Token::StringLiteral("hello, world".to_string()));
         assert_next_token_eq!(&mut l, Token::CloseParen);
+        assert_eof!(&mut l);
 
         Ok(())
     }
