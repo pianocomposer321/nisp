@@ -61,6 +61,15 @@ impl Parser {
                 if next_token == Token::CloseParen {
                     self.advance();
                     Ok(Expr::Unit)
+                } else if let Token::Symbol(s) = next_token {
+                    self.advance();
+                    let next_token = self.get_token()?;
+                    if next_token == Token::CloseParen {
+                        self.advance();
+                        Ok(Expr::Call(s, vec![]))
+                    } else {
+                        todo!()
+                    }
                 } else {
                     Err(ParsingError::UnexpectedToken(next_token))
                 }
@@ -153,6 +162,14 @@ mod test {
     fn parse_empty_list() -> ParsingResult<()> {
         let mut p = parse("[]");
         assert_next_expr_eq!(p, Expr::List(vec![]));
+
+        Ok(())
+    }
+
+    #[test]
+    fn parse_empty_call() -> ParsingResult<()> {
+        let mut p = parse("(foo)");
+        assert_next_expr_eq!(p, Expr::Call("foo".to_string(), vec![]));
 
         Ok(())
     }
