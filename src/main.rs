@@ -1,6 +1,8 @@
+pub mod expression;
+pub mod function;
+pub mod intrinsic;
 pub mod lexer;
 pub mod parser;
-pub mod expression;
 
 use std::io;
 
