@@ -94,6 +94,23 @@ impl Parser {
                     Ok(Expr::List(exprs))
                 }
             }
+            Token::OpenBrace => {
+                self.advance();
+                let next_token = self.get_token()?;
+                if next_token == Token::CloseBrace {
+                    self.advance();
+                    Ok(Expr::Block(vec![]))
+                } else {
+                    let mut exprs = Vec::new();
+                    let mut parser = Parser::from(self);
+
+                    while let Ok(expr) = parser.parse_next_expr() {
+                        exprs.push(expr);
+                    }
+                    self.position = parser.position;
+                    Ok(Expr::Block(exprs))
+                }
+            }
             _ => {
                 self.advance();
                 Err(ParsingError::UnexpectedToken(token))
@@ -200,6 +217,22 @@ mod test {
     fn parse_call() -> ParsingResult<()> {
         let mut p = parse("(foo 123)");
         assert_next_expr_eq!(p, Expr::Call("foo".to_string(), vec![Expr::Int(123)]));
+
+        Ok(())
+    }
+
+    #[test]
+    fn parse_empty_block() -> ParsingResult<()> {
+        let mut p = parse("{}");
+        assert_next_expr_eq!(p, Expr::Block(vec![]));
+        
+        Ok(())
+    }
+
+    #[test]
+    fn parse_block() -> ParsingResult<()> {
+        let mut p = parse("{1 2 3}");
+        assert_next_expr_eq!(p, Expr::Block(vec![Expr::Int(1), Expr::Int(2), Expr::Int(3)]));
 
         Ok(())
     }

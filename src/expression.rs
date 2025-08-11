@@ -9,6 +9,7 @@ pub enum EvalError {
 pub enum Expr {
     Call(String, Vec<Expr>),
     List(Vec<Expr>),
+    Block(Vec<Expr>),
     Int(i64),
     String(String),
     Symbol(String),
