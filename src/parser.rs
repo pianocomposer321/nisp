@@ -227,4 +227,13 @@ mod test {
         ]));
         Ok(())
     }
+
+    #[test]
+    fn parse_file() -> ParsingResult<()> {
+        let mut p = Parser::new(super::lexer::Lexer::from_file("input.nisp").unwrap().iter().collect());
+        assert_next_expr_eq!(p, Expr::Call("print".to_string(), vec![Expr::String("hello, world".to_string())]));
+        assert_next_expr_eq!(p, Expr::Call("+".to_string(), vec![Expr::Int(123), Expr::Int(456)]));
+
+        Ok(())
+    }
 }
