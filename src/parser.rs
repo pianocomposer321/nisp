@@ -65,6 +65,16 @@ impl Parser {
                     Err(ParsingError::UnexpectedToken(next_token))
                 }
             },
+            Token::OpenBracket => {
+                self.advance();
+                let next_token = self.get_token()?;
+                if next_token == Token::CloseBracket {
+                    self.advance();
+                    Ok(Expr::List(vec![]))
+                } else {
+                    Err(ParsingError::UnexpectedToken(next_token))
+                }
+            }
             _ => {
                 self.advance();
                 Err(ParsingError::UnexpectedToken(token))
@@ -135,6 +145,14 @@ mod test {
     fn parse_unit() -> ParsingResult<()> {
         let mut p = parse("()");
         assert_next_expr_eq!(p, Expr::Unit);
+
+        Ok(())
+    }
+
+    #[test]
+    fn parse_empty_list() -> ParsingResult<()> {
+        let mut p = parse("[]");
+        assert_next_expr_eq!(p, Expr::List(vec![]));
 
         Ok(())
     }
