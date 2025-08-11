@@ -1,3 +1,4 @@
+use std::rc::Rc;
 use crate::lexer::{self, Token};
 
 use thiserror::Error;
@@ -23,13 +24,13 @@ pub enum Expr {
 }
 
 pub struct Parser {
-    tokens: Vec<lexer::Token>,
+    tokens: Rc<[lexer::Token]>,
     position: usize,
 }
 
 impl Parser {
     pub fn new(tokens: Vec<lexer::Token>) -> Self {
-        Self { tokens, position: 0 }
+        Self { tokens: tokens.into_boxed_slice().into(), position: 0 }
     }
 
     pub fn parse_all(&mut self) -> ParsingResult<Vec<Expr>> {
