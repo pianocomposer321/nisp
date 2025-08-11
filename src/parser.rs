@@ -80,6 +80,7 @@ impl Parser {
                         while let Ok(expr) = parser.parse_next_expr() {
                             exprs.push(expr);
                         }
+                        self.position = parser.position;
                         Ok(Expr::Call(s, exprs))
                     }
                 } else {
@@ -99,6 +100,7 @@ impl Parser {
                     while let Ok(expr) = parser.parse_next_expr() {
                         exprs.push(expr);
                     }
+                    self.position = parser.position;
                     Ok(Expr::List(exprs))
                 }
             }
@@ -118,6 +120,10 @@ impl Parser {
 
     fn advance(&mut self) {
         self.position += 1;
+    }
+
+    fn advance_by(&mut self, n: usize) {
+        self.position += n;
     }
 }
 
@@ -205,6 +211,20 @@ mod test {
         let mut p = parse("(foo 123)");
         assert_next_expr_eq!(p, Expr::Call("foo".to_string(), vec![Expr::Int(123)]));
 
+        Ok(())
+    }
+
+    #[test]
+    fn parse_complex_expr() -> ParsingResult<()> {
+        let mut p = parse("(foo [bar (baz 123 \"hello\") qux] quux)");
+        assert_next_expr_eq!(p, Expr::Call("foo".to_string(), vec![
+            Expr::List(vec![
+                Expr::Symbol("bar".to_string()),
+                Expr::Call("baz".to_string(), vec![Expr::Int(123), Expr::String("hello".to_string())]),
+                Expr::Symbol("qux".to_string()),
+            ]),
+            Expr::Symbol("quux".to_string()),
+        ]));
         Ok(())
     }
 }
