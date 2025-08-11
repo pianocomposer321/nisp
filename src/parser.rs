@@ -35,14 +35,12 @@ impl Parser {
     pub fn parse_all(&mut self) -> ParsingResult<Vec<Expr>> {
         let mut exprs = vec![];
         while let Ok(expr) = self.parse_next_expr() {
-            dbg!(&expr);
             exprs.push(expr);
         }
         Ok(exprs)
     }
 
     pub fn parse_next_expr(&mut self) -> ParsingResult<Expr> {
-        dbg!(&self.tokens);
 
         let token = self.get_token();
         if !token.is_ok() {
