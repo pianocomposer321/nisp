@@ -93,7 +93,13 @@ impl Parser {
                     self.advance();
                     Ok(Expr::List(vec![]))
                 } else {
-                    Err(ParsingError::UnexpectedToken(next_token))
+                    let mut exprs = Vec::new();
+                    let mut parser = Parser::from(self);
+
+                    while let Ok(expr) = parser.parse_next_expr() {
+                        exprs.push(expr);
+                    }
+                    Ok(Expr::List(exprs))
                 }
             }
             _ => {
@@ -174,6 +180,14 @@ mod test {
     fn parse_empty_list() -> ParsingResult<()> {
         let mut p = parse("[]");
         assert_next_expr_eq!(p, Expr::List(vec![]));
+
+        Ok(())
+    }
+
+    #[test]
+    fn parse_list() -> ParsingResult<()> {
+        let mut p = parse("[1 2 3]");
+        assert_next_expr_eq!(p, Expr::List(vec![Expr::Int(1), Expr::Int(2), Expr::Int(3)]));
 
         Ok(())
     }
