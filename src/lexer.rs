@@ -65,20 +65,32 @@ pub struct Lexer {
 #[allow(dead_code)]
 impl Lexer {
     pub fn new(input: Vec<String>) -> Self {
-        Self { input: input.iter().map(|s| s.chars().collect()).collect(), line: 0, col: 0 }
+        Self {
+            input: input.iter().map(|s| s.chars().collect()).collect(),
+            line: 0,
+            col: 0,
+        }
     }
 
     pub fn from_string(input: impl Into<String>) -> Self {
         let input: String = input.into();
         let input: Vec<Vec<char>> = input.lines().map(|s| s.chars().collect()).collect();
-        Self { input, line: 0, col: 0 }
+        Self {
+            input,
+            line: 0,
+            col: 0,
+        }
     }
 
     pub fn from_file(filename: impl AsRef<Path>) -> io::Result<Self> {
         let contents = fs::read_to_string(filename)?;
         let input: Vec<Vec<char>> = contents.lines().map(|s| s.chars().collect()).collect();
 
-        Ok(Self { input, line: 0, col: 0 })
+        Ok(Self {
+            input,
+            line: 0,
+            col: 0,
+        })
     }
 
     pub fn get_next_token(&mut self) -> LexingResult<Token> {
@@ -115,7 +127,10 @@ impl Lexer {
             return Ok(Token::CloseBrace);
         }
         if matches!(ch, '0'..'9') {
-            let number: String = self.get_slice_until_or_end(|c| !matches!(c, '0'..'9')).iter().collect();
+            let number: String = self
+                .get_slice_until_or_end(|c| !matches!(c, '0'..'9'))
+                .iter()
+                .collect();
             self.advance_by(number.len());
             return Ok(Token::IntLiteral(number.parse()?));
         }
