@@ -27,6 +27,7 @@ impl Expr {
     pub fn eval(self) -> Result<Value, EvalError> {
         match self {
             Expr::Int(i) => Ok(Value::Int(i)),
+            Expr::String(s) => Ok(Value::String(s)),
             _ => todo!()
         }
     }
@@ -66,6 +67,14 @@ mod test {
     fn eval_int() -> ExprTestResult<()> {
         let mut values = eval("42")?.into_iter();
         assert_next_value_eq!(values, Value::Int(42));
+
+        Ok(())
+    }
+
+    #[test]
+    fn eval_string() -> ExprTestResult<()> {
+        let mut values = eval("\"hello, world\"")?.into_iter();
+        assert_next_value_eq!(values, Value::String("hello, world".to_string()));
 
         Ok(())
     }
