@@ -1,38 +1,17 @@
-use std::{collections::HashMap, rc::Rc};
+use std::{cell::RefMut, rc::Rc};
 
 use thiserror::Error;
 
-use crate::callable::{Builtin, FunctionDefn};
-
-#[derive(Clone, Debug)]
-pub struct Scope {
-    builtins: Rc<HashMap<String, Builtin>>,
-    parent: Option<Rc<Scope>>,
-    values: Rc<HashMap<String, Value>>,
-}
-
-impl Scope {
-    pub fn new(builtins: Vec<Builtin>) -> Self {
-        Self {
-            builtins: Rc::new(builtins.into_iter().map(|b| (b.name.clone(), b)).collect()),
-            parent: None,
-            values: Rc::new(HashMap::new()),
-        }
-    }
-
-    pub fn get_builtin(&self, name: &str) -> Option<&Builtin> {
-        self.builtins.get(name)
-    }
-
-    pub fn get_value(&self, name: &str) -> Option<&Value> {
-        self.values.get(name)
-    }
-}
+use crate::{callable::FunctionDefn, scope::{Scope, ScopeError}};
 
 #[derive(Error, Debug)]
 pub enum EvalError {
     #[error("Type error: expected {expected:?} but got {got:?}")]
     TypeError { expected: String, got: String },
+    #[error("Not enough arguments: expected {expected:?} but got {got:?}")]
+    NotEnoughArgs { expected: usize, got: usize },
+    #[error(transparent)]
+    ScopeError(#[from] ScopeError),
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -50,31 +29,87 @@ impl Expr {
     pub fn eval(self, scope: Scope) -> Result<Value, EvalError> {
         match self {
             Expr::Int(i) => Ok(Value::Int(i)),
-            Expr::String(s) => Ok(Value::String(s)),
+            Expr::String(s) => Ok(Value::String(Rc::new(s))),
             Expr::Call(name, args) => {
+                let child_scope = Scope::child(scope.clone());
                 if let Some(builtin) = scope.get_builtin(&name) {
                     let values = args
                         .into_iter()
-                        .map(|a| a.eval(scope.clone()))
+                        .map(|a| a.eval(child_scope.clone()))
                         .collect::<Result<Vec<_>, _>>()?;
-                    return builtin.call(scope.clone(), values);
+                    return builtin.call(scope, values);
+                }
+                if let Some(intrinsic) = scope.get_intrinsic(&name) {
+                    return intrinsic.call(scope, args);
+                }
+                todo!()
+            }
+            Expr::Symbol(name) => {
+                if let Some(value) = scope.get_value(&name) {
+                    return Ok(value);
                 }
                 todo!()
             }
             _ => todo!(),
         }
     }
+
+    pub fn type_name(&self) -> String {
+        match self {
+            Expr::Int(_) => "Int".to_string(),
+            Expr::String(_) => "String".to_string(),
+            Expr::Call(_, _) => "Call".to_string(),
+            Expr::List(_) => "List".to_string(),
+            Expr::Block(_) => "Block".to_string(),
+            Expr::Symbol(_) => "Symbol".to_string(),
+            Expr::Unit => "Unit".to_string(),
+        }
+    }
+
+    pub fn as_int(&self) -> Result<i64, EvalError> {
+        match self {
+            Expr::Int(i) => Ok(*i),
+            _ => Err(EvalError::TypeError {
+                expected: "Int".to_string(),
+                got: self.type_name(),
+            }),
+        }
+    }
+
+    pub fn as_string(&self) -> Result<String, EvalError> {
+        match self {
+            Expr::String(s) => Ok(s.clone()),
+            _ => Err(EvalError::TypeError {
+                expected: "String".to_string(),
+                got: self.type_name(),
+            }),
+        }
+    }
+
+    pub fn as_symbol(&self) -> Result<String, EvalError> {
+        match self {
+            Expr::Symbol(s) => Ok(s.clone()),
+            _ => Err(EvalError::TypeError {
+                expected: "Symbol".to_string(),
+                got: self.type_name(),
+            }),
+        }
+    }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Value {
     Int(i64),
-    String(String),
-    FunctionDefn(FunctionDefn),
+    String(Rc<String>),
+    FunctionDefn(Rc<FunctionDefn>),
     Unit,
 }
 
 impl Value {
+    pub fn new_string(s: &str) -> Self {
+        Value::String(Rc::new(s.to_string()))
+    }
+
     pub fn as_int(&self) -> Result<i64, EvalError> {
         match self {
             Value::Int(i) => Ok(*i),
@@ -87,7 +122,7 @@ impl Value {
 
     pub fn as_string(&self) -> Result<String, EvalError> {
         match self {
-            Value::String(s) => Ok(s.clone()),
+            Value::String(s) => Ok(Rc::into_inner(s.clone()).unwrap()),
             _ => Err(EvalError::TypeError {
                 expected: "String".to_string(),
                 got: self.type_name(),
@@ -107,7 +142,7 @@ impl Value {
 
 #[cfg(test)]
 mod test {
-    use crate::callable::FunctionBody;
+    use crate::callable::{default_builtins, default_intrinsics};
 
     use super::*;
 
@@ -131,18 +166,10 @@ mod test {
     }
 
     fn scope() -> Scope {
-        let mut builtins = Vec::new();
-        builtins.push(Builtin::new(
-            "+",
-            FunctionBody::new(|_, vals| {
-                let mut sum = 0;
-                for v in vals {
-                    sum += v.as_int()?;
-                }
-                Ok(Value::Int(sum))
-            }),
-        ));
-        Scope::new(builtins)
+        Scope::from((
+            default_builtins::builtins(),
+            default_intrinsics::intrinsics(),
+        ))
     }
 
     fn eval(scope: Scope, input: &str) -> ExprTestResult<Vec<Value>> {
@@ -168,7 +195,7 @@ mod test {
     fn eval_string() -> ExprTestResult<()> {
         let scope = scope();
         let mut values = eval(scope, "\"hello, world\"")?.into_iter();
-        assert_next_value_eq!(values, Value::String("hello, world".to_string()));
+        assert_next_value_eq!(values, Value::new_string("hello, world"));
 
         Ok(())
     }
@@ -187,6 +214,16 @@ mod test {
         let scope = scope();
         let mut values = eval(scope, "(+ 1 2 3)")?.into_iter();
         assert_next_value_eq!(values, Value::Int(6));
+
+        Ok(())
+    }
+
+    #[test]
+    fn eval_variable() -> ExprTestResult<()> {
+        let scope = scope();
+        let mut values = eval(scope, "(set x 10) x")?.into_iter();
+        assert_next_value_eq!(values, Value::Unit);
+        assert_next_value_eq!(values, Value::Int(10));
 
         Ok(())
     }

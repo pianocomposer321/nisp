@@ -310,7 +310,10 @@ mod test {
                 "defn".to_string(),
                 vec![
                     Expr::Symbol("foo".to_string()),
-                    Expr::List(vec![Expr::Symbol("x".to_string()), Expr::Symbol("y".to_string())]),
+                    Expr::List(vec![
+                        Expr::Symbol("x".to_string()),
+                        Expr::Symbol("y".to_string())
+                    ]),
                     Expr::Call(
                         "+".to_string(),
                         vec![Expr::Symbol("x".to_string()), Expr::Symbol("y".to_string())]
