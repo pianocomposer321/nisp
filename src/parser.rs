@@ -41,13 +41,7 @@ impl Parser {
     }
 
     pub fn parse_next_expr(&mut self) -> ParsingResult<Expr> {
-
-        let token = self.get_token();
-        if !token.is_ok() {
-            self.advance();
-            return Ok(Expr::Unit);
-        }
-        let token = token?;
+        let token = self.get_token()?;
         match token {
             Token::IntLiteral(i) => {
                 self.advance();
@@ -115,6 +109,14 @@ mod test {
     fn parse_symbol() -> ParsingResult<()> {
         let mut p = parse("foo");
         assert_next_expr_eq!(p, Expr::Symbol("foo".to_string()));
+
+        Ok(())
+    }
+
+    #[test]
+    fn parse_empty() -> ParsingResult<()> {
+        let mut p = parse("");
+        assert!(matches!(p.parse_next_expr(), Err(ParsingError::UnexpectedEOF)));
 
         Ok(())
     }
