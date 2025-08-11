@@ -55,6 +55,16 @@ impl Parser {
                 self.advance();
                 Ok(Expr::Symbol(s))
             },
+            Token::OpenParen => {
+                self.advance();
+                let next_token = self.get_token()?;
+                if next_token == Token::CloseParen {
+                    self.advance();
+                    Ok(Expr::Unit)
+                } else {
+                    Err(ParsingError::UnexpectedToken(next_token))
+                }
+            },
             _ => {
                 self.advance();
                 Err(ParsingError::UnexpectedToken(token))
@@ -117,6 +127,14 @@ mod test {
     fn parse_empty() -> ParsingResult<()> {
         let mut p = parse("");
         assert!(matches!(p.parse_next_expr(), Err(ParsingError::UnexpectedEOF)));
+
+        Ok(())
+    }
+
+    #[test]
+    fn parse_unit() -> ParsingResult<()> {
+        let mut p = parse("()");
+        assert_next_expr_eq!(p, Expr::Unit);
 
         Ok(())
     }
