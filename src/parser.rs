@@ -34,6 +34,10 @@ impl Parser {
         Self { tokens: tokens.into_boxed_slice().into(), position: 0 }
     }
 
+    pub fn from(other: &Parser) -> Self {
+        Self { tokens: other.tokens.clone(), position: other.position }
+    }
+
     pub fn parse_all(&mut self) -> ParsingResult<Vec<Expr>> {
         let mut exprs = vec![];
         while let Ok(expr) = self.parse_next_expr() {
@@ -71,10 +75,7 @@ impl Parser {
                         Ok(Expr::Call(s, vec![]))
                     } else {
                         let mut exprs = Vec::new();
-                        let mut parser = Parser {
-                            tokens: self.tokens.clone(),
-                            position: self.position
-                        };
+                        let mut parser = Parser::from(self);
 
                         while let Ok(expr) = parser.parse_next_expr() {
                             exprs.push(expr);
