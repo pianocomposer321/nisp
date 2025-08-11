@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use crate::lexer::{self, Token};
+use crate::{expression::Expr, lexer::{self, Token}};
 
 use thiserror::Error;
 
@@ -13,16 +13,6 @@ pub enum ParsingError {
 }
 
 type ParsingResult<T> = Result<T, ParsingError>;
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum Expr {
-    Call(String, Vec<Expr>),
-    List(Vec<Expr>),
-    Int(i64),
-    String(String),
-    Symbol(String),
-    Unit,
-}
 
 pub struct Parser {
     tokens: Rc<[lexer::Token]>,
