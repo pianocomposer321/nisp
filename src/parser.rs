@@ -301,6 +301,24 @@ mod test {
         Ok(())
     }
 
+    #[test]
+    fn parse_function_definition() -> ParsingResult<()> {
+        let mut p = parse("(defn foo [x y] (+ x y))");
+        assert_next_expr_eq!(
+            p,
+            Expr::Call(
+                "defn".to_string(),
+                vec![
+                    Expr::Symbol("foo".to_string()),
+                    Expr::List(vec![Expr::Symbol("x".to_string()), Expr::Symbol("y".to_string())]),
+                    Expr::Call(
+                        "+".to_string(),
+                        vec![Expr::Symbol("x".to_string()), Expr::Symbol("y".to_string())]
+                    ),
+                ]
+            )
+        );
+
         Ok(())
     }
 }
