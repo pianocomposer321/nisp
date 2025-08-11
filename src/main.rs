@@ -1,6 +1,5 @@
 pub mod expression;
-pub mod function;
-pub mod intrinsic;
+pub mod callable;
 pub mod lexer;
 pub mod parser;
 

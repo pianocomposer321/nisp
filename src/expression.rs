@@ -2,31 +2,22 @@ use std::{collections::HashMap, rc::Rc};
 
 use thiserror::Error;
 
-use crate::{
-    function::{Builtin, FunctionDefn},
-    intrinsic::Intrinsic,
-};
+use crate::callable::{Builtin, FunctionDefn};
 
 #[derive(Clone, Debug)]
 pub struct Scope {
-    intrinsics: Rc<HashMap<String, Intrinsic>>,
     builtins: Rc<HashMap<String, Builtin>>,
     parent: Option<Rc<Scope>>,
     values: Rc<HashMap<String, Value>>,
 }
 
 impl Scope {
-    pub fn new(intrinsics: HashMap<String, Intrinsic>, builtins: Vec<Builtin>) -> Self {
+    pub fn new(builtins: Vec<Builtin>) -> Self {
         Self {
-            intrinsics: Rc::new(intrinsics),
             builtins: Rc::new(builtins.into_iter().map(|b| (b.name.clone(), b)).collect()),
             parent: None,
             values: Rc::new(HashMap::new()),
         }
-    }
-
-    pub fn get_intrinsic(&self, name: &str) -> Option<&Intrinsic> {
-        self.intrinsics.get(name)
     }
 
     pub fn get_builtin(&self, name: &str) -> Option<&Builtin> {
@@ -116,7 +107,7 @@ impl Value {
 
 #[cfg(test)]
 mod test {
-    use crate::function::FunctionBody;
+    use crate::callable::FunctionBody;
 
     use super::*;
 
@@ -151,7 +142,7 @@ mod test {
                 Ok(Value::Int(sum))
             }),
         ));
-        Scope::new(HashMap::new(), builtins)
+        Scope::new(builtins)
     }
 
     fn eval(scope: Scope, input: &str) -> ExprTestResult<Vec<Value>> {
