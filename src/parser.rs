@@ -1,4 +1,5 @@
 use std::rc::Rc;
+
 use crate::lexer::{self, Token};
 
 use thiserror::Error;
@@ -69,7 +70,16 @@ impl Parser {
                         self.advance();
                         Ok(Expr::Call(s, vec![]))
                     } else {
-                        todo!()
+                        let mut exprs = Vec::new();
+                        let mut parser = Parser {
+                            tokens: self.tokens.clone(),
+                            position: self.position
+                        };
+
+                        while let Ok(expr) = parser.parse_next_expr() {
+                            exprs.push(expr);
+                        }
+                        Ok(Expr::Call(s, exprs))
                     }
                 } else {
                     Err(ParsingError::UnexpectedToken(next_token))
@@ -171,6 +181,14 @@ mod test {
     fn parse_empty_call() -> ParsingResult<()> {
         let mut p = parse("(foo)");
         assert_next_expr_eq!(p, Expr::Call("foo".to_string(), vec![]));
+
+        Ok(())
+    }
+
+    #[test]
+    fn parse_call() -> ParsingResult<()> {
+        let mut p = parse("(foo 123)");
+        assert_next_expr_eq!(p, Expr::Call("foo".to_string(), vec![Expr::Int(123)]));
 
         Ok(())
     }
