@@ -59,6 +59,10 @@ impl Parser {
                 self.advance();
                 Ok(Expr::String(s))
             }
+            Token::Symbol(s) => {
+                self.advance();
+                Ok(Expr::Symbol(s))
+            },
             _ => {
                 self.advance();
                 Err(ParsingError::UnexpectedToken(token))
@@ -105,6 +109,14 @@ mod test {
     fn parse_string() -> ParsingResult<()> {
         let mut p = parse("\"Hello, world!\"");
         assert_next_expr_eq!(p, Expr::String("Hello, world!".to_string()));
+
+        Ok(())
+    }
+
+    #[test]
+    fn parse_symbol() -> ParsingResult<()> {
+        let mut p = parse("foo");
+        assert_next_expr_eq!(p, Expr::Symbol("foo".to_string()));
 
         Ok(())
     }
