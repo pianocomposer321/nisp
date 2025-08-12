@@ -642,4 +642,22 @@ mod test {
 
         Ok(())
     }
+
+    #[test]
+    fn eval_cond() -> ExprTestResult<()> {
+        let scope = scope();
+        let mut values = eval(scope.clone(), "(cond [(= 1 1) 1])")?.into_iter();
+        assert_next_value_eq!(values, Value::Int(1));
+
+        let mut values = eval(scope.clone(), "(cond [(= 1 2) 1])")?.into_iter();
+        assert_next_value_eq!(values, Value::Unit);
+
+        let mut values = eval(scope.clone(), "(cond [(= 1 1) 1 (= 1 2) 2])")?.into_iter();
+        assert_next_value_eq!(values, Value::Int(1));
+
+        let mut values = eval(scope.clone(), "(cond [(= 1 2) 1 (= 2 2) 2])")?.into_iter();
+        assert_next_value_eq!(values, Value::Int(2));
+
+        Ok(())
+    }
 }

@@ -436,7 +436,6 @@ pub mod default_intrinsics {
         for window in body.chunks(2) {
             let (pattern, body) = (window[0].clone(), window[1].clone());
 
-            // dbg!(&pattern, &value);
             match scope.pattern_match_assign(pattern, value.clone()) {
                 Ok(_) => {
                     let child_scope = Scope::child(scope.clone());
@@ -456,6 +455,28 @@ pub mod default_intrinsics {
         Err(EvalError::NoMatchingPattern { right: value })
     }
 
+    fn cond(scope: Scope, exprs: Vec<Expr>) -> Result<Value, EvalError> {
+        let mut iter = exprs.into_iter();
+        let conditions = iter
+            .next()
+            .ok_or(EvalError::NotEnoughArgs {
+                expected: 2,
+                got: 0,
+            })?
+            .as_list()?;
+
+        for chunk in conditions.chunks(2) {
+            let (condition, body) = (chunk[0].clone(), chunk[1].clone());
+
+            let condition = condition.eval(scope.clone())?;
+            if condition.as_bool()? {
+                return body.eval(scope);
+            }
+        }
+
+        Ok(Value::Unit)
+    }
+
     fn make_intrinsic(name: &str, body: impl IntrinsicBodyFn) -> (String, Rc<Intrinsic>) {
         (name.to_string(), Rc::new(Intrinsic::new(name, IntrinsicBody::new(body))))
     }
@@ -466,6 +487,7 @@ pub mod default_intrinsics {
             make_intrinsic("defn", defn),
             make_intrinsic("if", if_),
             make_intrinsic("match", match_),
+            make_intrinsic("cond", cond),
         ])
     }
 }
