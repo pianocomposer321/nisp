@@ -356,4 +356,14 @@ mod test {
 
         Ok(())
     }
+
+    #[test]
+    fn eval_recursive_function() -> ExprTestResult<()> {
+        let scope = scope();
+        let mut values = eval(scope.clone(), "(defn f [x] (if (= x 10) 10 (f (+ x 1)))) (f 1)")?.into_iter();
+        assert_next_value_eq!(values, Value::Unit);
+        assert_next_value_eq!(values, Value::Int(10));
+
+        Ok(())
+    }
 }
