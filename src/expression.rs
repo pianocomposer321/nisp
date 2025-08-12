@@ -64,6 +64,10 @@ impl Expr {
             }
             Expr::Bool(b) => Ok(Value::Bool(b)),
             Expr::Block(b) => eval_block(Scope::child(scope), b),
+            Expr::List(l) => {
+                let values = Expr::values(scope.clone(), l)?;
+                Ok(Value::List(Rc::new(values)))
+            },
             _ => todo!(),
         }
     }
@@ -146,6 +150,7 @@ pub enum Value {
     String(Rc<String>),
     FunctionDefn(Rc<FunctionDefn>),
     Bool(bool),
+    List(Rc<Vec<Value>>),
     Unit,
 }
 
@@ -156,6 +161,21 @@ impl ToString for Value {
             Value::String(s) => s.to_string(),
             Value::FunctionDefn(d) => d.to_string(),
             Value::Bool(b) => b.to_string(),
+            Value::List(l) => {
+                let mut s = String::new();
+                s.push('[');
+                let mut iter = l.iter();
+                if let Some(first) = iter.next() {
+                    s.push_str(&first.to_string());
+                }
+                for value in iter {
+                    s.push_str(", ");
+                    s.push_str(&value.to_string());
+                }
+                s.push(']');
+
+                s
+            },
             Value::Unit => "()".to_string(),
         }
     }
@@ -212,6 +232,7 @@ impl Value {
             Value::String(_) => "String".to_string(),
             Value::FunctionDefn(_) => "FunctionDefn".to_string(),
             Value::Bool(_) => "Bool".to_string(),
+            Value::List(_) => "List".to_string(),
             Value::Unit => "Unit".to_string(),
         }
     }
@@ -496,6 +517,23 @@ mod test {
 
         let mut values = eval(scope.clone(), "(string 123)")?.into_iter();
         assert_next_value_eq!(values, Value::String(Rc::new("123".to_string())));
+
+        Ok(())
+    }
+
+    #[test]
+    fn eval_list() -> ExprTestResult<()> {
+        let scope = scope();
+        let mut values = eval(scope.clone(), "[1 2 3]")?.into_iter();
+        assert_next_value_eq!(values, Value::List(Rc::new(vec![Value::Int(1), Value::Int(2), Value::Int(3)])));
+
+        Ok(())
+    }
+
+    #[test]
+    fn list_to_string() -> ExprTestResult<()> {
+        let list = Value::List(Rc::new(vec![Value::Int(1), Value::Int(2), Value::Int(3)]));
+        assert_eq!(list.to_string(), "[1, 2, 3]");
 
         Ok(())
     }
