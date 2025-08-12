@@ -263,6 +263,18 @@ pub mod default_builtins {
         Ok(Value::Unit)
     }
 
+    fn string(vals: Vec<Value>) -> Result<Value, EvalError> {
+        let mut iter = vals.into_iter();
+        let value = iter
+            .next()
+            .ok_or(EvalError::NotEnoughArgs {
+                expected: 1,
+                got: 0,
+            })?;
+
+        Ok(Value::String(Rc::new(value.to_string())))
+    }
+
     fn make_builtin(name: &str, body: impl BuiltinBodyFn) -> (String, Rc<Builtin>) {
         (name.to_string(), Rc::new(Builtin::new(name, FunctionBody::new(body))))
     }
@@ -285,6 +297,7 @@ pub mod default_builtins {
             make_builtin("lt", lt),
             make_builtin("print", print),
             make_builtin("assert", assert),
+            make_builtin("string", string),
         ])
     }
 }

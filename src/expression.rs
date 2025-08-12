@@ -475,4 +475,15 @@ mod test {
     // fn eval_test_files() -> ExprTestResult<()> {
     //     todo!()
     // }
+    #[test]
+    fn eval_string_fn() -> ExprTestResult<()> {
+        let scope = scope();
+        let mut values = eval(scope.clone(), "(string \"hello\")")?.into_iter();
+        assert_next_value_eq!(values, Value::String(Rc::new("hello".to_string())));
+
+        let mut values = eval(scope.clone(), "(string 123)")?.into_iter();
+        assert_next_value_eq!(values, Value::String(Rc::new("123".to_string())));
+
+        Ok(())
+    }
 }
