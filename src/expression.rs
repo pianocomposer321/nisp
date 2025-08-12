@@ -2,7 +2,7 @@ use std::{cell::RefMut, rc::Rc};
 
 use thiserror::Error;
 
-use crate::{callable::Function, scope::{Scope, ScopeError}};
+use crate::{callable::FunctionDefn, scope::{Scope, ScopeError}};
 
 #[derive(Error, Debug)]
 pub enum EvalError {
@@ -12,9 +12,11 @@ pub enum EvalError {
     NotEnoughArgs { expected: usize, got: usize },
     #[error(transparent)]
     ScopeError(#[from] ScopeError),
+    #[error("Pattern match length mismatch: expected {expected:?} but got {got:?}")]
+    PatternMatchLengthMismatch { expected: usize, got: usize },
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Expr {
     Call(String, Vec<Expr>),
     List(Vec<Expr>),
@@ -31,27 +33,34 @@ impl Expr {
             Expr::Int(i) => Ok(Value::Int(i)),
             Expr::String(s) => Ok(Value::String(Rc::new(s))),
             Expr::Call(name, args) => {
-                let child_scope = Scope::child(scope.clone());
+                let mut child_scope = Scope::child(scope.clone());
                 if let Some(builtin) = scope.get_builtin(&name) {
-                    let values = args
-                        .into_iter()
-                        .map(|a| a.eval(child_scope.clone()))
-                        .collect::<Result<Vec<_>, _>>()?;
+                    let values = Expr::values(child_scope.clone(), args)?;
                     return builtin.call(scope, values);
                 }
                 if let Some(intrinsic) = scope.get_intrinsic(&name) {
                     return intrinsic.call(scope, args);
                 }
-                todo!()
+
+                let function = scope.get_value(&name)?.as_function_defn()?;
+                child_scope.pattern_match_assign(function.args(), args)?;
+                function.call(child_scope.clone())
             }
             Expr::Symbol(name) => {
-                if let Some(value) = scope.get_value(&name) {
+                if let Ok(value) = scope.get_value(&name) {
                     return Ok(value);
                 }
                 todo!()
             }
             _ => todo!(),
         }
+    }
+
+    pub fn values(scope: Scope, exprs: Vec<Expr>) -> Result<Vec<Value>, EvalError> {
+        exprs
+            .into_iter()
+            .map(|e| e.eval(scope.clone()))
+            .collect()
     }
 
     pub fn type_name(&self) -> String {
@@ -95,13 +104,34 @@ impl Expr {
             }),
         }
     }
+
+    pub fn as_list(self) -> Result<Vec<Expr>, EvalError> {
+        match self {
+            Expr::List(l) => Ok(l),
+            _ => Err(EvalError::TypeError {
+                expected: "List".to_string(),
+                got: self.type_name(),
+            }),
+        }
+    }
+
+    pub fn as_block(self) -> Result<Vec<Expr>, EvalError> {
+        match self {
+            Expr::Block(b) => Ok(b),
+            Expr::Call(_, _) => Ok(vec![self]),
+            _ => Err(EvalError::TypeError {
+                expected: "Block".to_string(),
+                got: self.type_name(),
+            }),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Value {
     Int(i64),
     String(Rc<String>),
-    FunctionDefn(Rc<Function>),
+    FunctionDefn(Rc<FunctionDefn>),
     Unit,
 }
 
@@ -121,9 +151,9 @@ impl Value {
         Value::String(Rc::new(s.to_string()))
     }
 
-    pub fn as_int(&self) -> Result<i64, EvalError> {
+    pub fn as_int(self) -> Result<i64, EvalError> {
         match self {
-            Value::Int(i) => Ok(*i),
+            Value::Int(i) => Ok(i),
             _ => Err(EvalError::TypeError {
                 expected: "Int".to_string(),
                 got: self.type_name(),
@@ -131,11 +161,21 @@ impl Value {
         }
     }
 
-    pub fn as_string(&self) -> Result<String, EvalError> {
+    pub fn as_string(self) -> Result<Rc<String>, EvalError> {
         match self {
-            Value::String(s) => Ok(s.to_string()),
+            Value::String(s) => Ok(s),
             _ => Err(EvalError::TypeError {
                 expected: "String | Int | Unit".to_string(),
+                got: self.type_name(),
+            }),
+        }
+    }
+
+    fn as_function_defn(self) -> Result<Rc<FunctionDefn>, EvalError> {
+        match self {
+            Value::FunctionDefn(f) => Ok(f),
+            _ => Err(EvalError::TypeError {
+                expected: "FunctionDefn".to_string(),
                 got: self.type_name(),
             }),
         }
@@ -247,6 +287,40 @@ mod test {
 
         let mut values = eval(scope.clone(), "(print \"hello\" \"world\")").unwrap().into_iter();
         assert_next_value_eq!(values, Value::Unit);
+    fn eval_print() -> ExprTestResult<()> {
+        let scope = scope();
+        let mut values = eval(scope.clone(), "(print \"hello\")")?.into_iter();
+        assert_next_value_eq!(values, Value::Unit);
+
+        let mut values = eval(scope.clone(), "(print \"hello\" \"world\")")?.into_iter();
+        assert_next_value_eq!(values, Value::Unit);
+
+        Ok(())
+    }
+
+    #[test]
+    fn eval_defn() -> ExprTestResult<()> {
+        let scope = scope();
+        let mut values = eval(scope.clone(), "(defn f [x] (+ x 1))")?.into_iter();
+        assert_next_value_eq!(values, Value::Unit);
+
+        let mut values = eval(scope.clone(), "(f 1)")?.into_iter();
+        assert_next_value_eq!(values, Value::Int(2));
+
+        Ok(())
+    }
+
+    #[test]
+    fn eval_defn_with_block() -> ExprTestResult<()> {
+        let scope = scope();
+        let mut values = eval(scope.clone(), "(defn f [x] { (set y (+ x 1)) (set z (+ x 2)) (+ y z) })")?.into_iter();
+        assert_next_value_eq!(values, Value::Unit);
+
+        let mut values = eval(scope.clone(), "(f 1)")?.into_iter();
+        assert_next_value_eq!(values, Value::Int(5));
+
+        Ok(())
+    }
 
         Ok(())
     }

@@ -66,20 +66,20 @@ impl Builtin {
 static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
 
 #[derive(Debug)]
-pub struct Function {
-    args: Expr,
-    body: FunctionBody,
+pub struct FunctionDefn {
+    args: Vec<Expr>,
+    body: Vec<Expr>,
     id: usize,
 }
 
-impl ToString for Function {
+impl ToString for FunctionDefn {
     fn to_string(&self) -> String {
         format!("<Function {}>", self.id)
     }
 }
 
-impl Function {
-    pub fn new(args: Expr, body: FunctionBody) -> Self {
+impl FunctionDefn {
+    pub fn new(args: Vec<Expr>, body: Vec<Expr>) -> Self {
         Self {
             args,
             body,
@@ -87,24 +87,29 @@ impl Function {
         }
     }
 
-    pub fn call(&self, scope: Scope, args: Vec<Value>) -> Result<Value, EvalError> {
-        (self.body.0)(scope, args)
+    pub fn args(&self) -> &[Expr] {
+        &self.args
+    }
+
+    pub fn call(&self, scope: Scope) -> Result<Value, EvalError> {
+        let values = Expr::values(scope.clone(), self.body.clone())?;
+        Ok(values.into_iter().last().unwrap_or(Value::Unit).clone())
     }
 }
 
-impl PartialEq for Function {
+impl PartialEq for FunctionDefn {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id
     }
 }
 
-pub trait FunctionBodyFn: Fn(Scope, Vec<Value>) -> Result<Value, EvalError> + 'static {}
-impl<T> FunctionBodyFn for T where T: Fn(Scope, Vec<Value>) -> Result<Value, EvalError> + 'static {}
+pub trait BuiltinBodyFn: Fn(Scope, Vec<Value>) -> Result<Value, EvalError> + 'static {}
+impl<T> BuiltinBodyFn for T where T: Fn(Scope, Vec<Value>) -> Result<Value, EvalError> + 'static {}
 
-pub struct FunctionBody(Box<dyn FunctionBodyFn>);
+pub struct FunctionBody(Box<dyn BuiltinBodyFn>);
 
 impl FunctionBody {
-    pub fn new(f: impl FunctionBodyFn) -> Self {
+    pub fn new(f: impl BuiltinBodyFn) -> Self {
         Self(Box::new(f))
     }
 }
@@ -147,7 +152,7 @@ pub mod default_builtins {
         Ok(Value::Unit)
     }
 
-    fn make_builtin(name: &str, body: impl FunctionBodyFn) -> (String, Rc<Builtin>) {
+    fn make_builtin(name: &str, body: impl BuiltinBodyFn) -> (String, Rc<Builtin>) {
         (name.to_string(), Rc::new(Builtin::new(name, FunctionBody::new(body))))
     }
 
@@ -185,6 +190,36 @@ pub mod default_intrinsics {
         Ok(Value::Unit)
     }
 
+    fn defn(mut scope: Scope, exprs: Vec<Expr>) -> Result<Value, EvalError> {
+        let mut iter = exprs.into_iter();
+        let function_name: String = iter
+            .next()
+            .ok_or(EvalError::NotEnoughArgs {
+                expected: 3,
+                got: 0,
+            })?
+            .as_symbol()?;
+        let args = iter
+            .next()
+            .ok_or(EvalError::NotEnoughArgs {
+                expected: 3,
+                got: 1,
+            })?
+            .as_list()?;
+        let body: Vec<Expr> = iter
+            .next()
+            .ok_or(EvalError::NotEnoughArgs {
+                expected: 3,
+                got: 2,
+            })?
+            .as_block()?;
+
+        let function = FunctionDefn::new(args, body);
+        scope.set_value(&function_name, Value::FunctionDefn(Rc::new(function)));
+
+        Ok(Value::Unit)
+    }
+
     fn make_intrinsic(name: &str, body: impl IntrinsicBodyFn) -> (String, Rc<Intrinsic>) {
         (name.to_string(), Rc::new(Intrinsic::new(name, IntrinsicBody::new(body))))
     }
@@ -192,6 +227,7 @@ pub mod default_intrinsics {
     pub fn intrinsics() -> HashMap<String, Rc<Intrinsic>> {
         HashMap::from([
             make_intrinsic("set", set),
+            make_intrinsic("defn", defn),
         ])
     }
 }
