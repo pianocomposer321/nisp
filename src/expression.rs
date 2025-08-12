@@ -19,9 +19,10 @@ pub enum EvalError {
     ScopeError(#[from] ScopeError),
     #[error("Pattern match length mismatch: expected {expected:?} but got {got:?}")]
     PatternMatchLengthMismatch { expected: usize, got: usize },
-
     #[error("Undefined variable: {name}")]
     UndefinedVariable { name: String },
+    #[error("Assertion failed")]
+    AssertionFailed,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -381,6 +382,17 @@ mod test {
         assert_next_value_eq!(values, Value::Unit);
         assert_next_value_eq!(values, Value::Int(3));
 
+        Ok(())
+    }
+
+    #[test]
+    fn eval_assert() -> ExprTestResult<()> {
+        let scope = scope();
+        let mut values = eval(scope.clone(), "(assert (= 1 1) (= 2 2))")?.into_iter();
+        assert_next_value_eq!(values, Value::Unit);
+
+        let values = eval(scope.clone(), "(assert (= 1 2))");
+        assert!(matches!(values.unwrap_err(), ExprTestError::EvalError(EvalError::AssertionFailed)));
         Ok(())
     }
 }

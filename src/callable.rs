@@ -168,6 +168,18 @@ pub mod default_builtins {
         Ok(Value::Bool(left == right))
     }
 
+    fn assert(vals: Vec<Value>) -> Result<Value, EvalError> {
+        let iter = vals.into_iter();
+
+        for value in iter {
+            if !value.as_bool()? {
+                return Err(EvalError::AssertionFailed);
+            }
+        }
+
+        Ok(Value::Unit)
+    }
+
     fn make_builtin(name: &str, body: impl BuiltinBodyFn) -> (String, Rc<Builtin>) {
         (name.to_string(), Rc::new(Builtin::new(name, FunctionBody::new(body))))
     }
@@ -178,6 +190,7 @@ pub mod default_builtins {
             make_builtin("print", print),
             make_builtin("=", eq),
             make_builtin("eq", eq),
+            make_builtin("assert", assert),
         ])
     }
 }
