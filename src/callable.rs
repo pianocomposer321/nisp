@@ -85,8 +85,8 @@ impl FunctionDefn {
         }
     }
 
-    pub fn args(&self) -> Expr {
-        self.args.clone()
+    pub fn args(&self) -> Result<Vec<Expr>, EvalError> {
+        self.args.clone().as_list()
     }
 
     pub fn call(&self, scope: Scope) -> Result<Value, EvalError> {

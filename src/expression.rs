@@ -66,9 +66,7 @@ impl Expr {
                 }
 
                 let function = scope.get_value(&name)?.as_function_defn()?;
-                for expr in args.into_iter() {
-                    child_scope.pattern_match_assign(function.args(), expr.eval(child_scope.clone())?)?;
-                }
+                child_scope.pattern_match_assign(Expr::List(function.args()?), Value::List(Rc::new(Expr::values(scope.clone(), args)?)))?;
                 function.call(child_scope.clone())
             }
             Expr::Symbol(name) => {
