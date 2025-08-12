@@ -124,12 +124,12 @@ impl Parser {
                 self.advance();
                 Ok(Expr::Bool(b))
             }
-            Token::RestOp => {
+            Token::SpreadOp => {
                 self.advance();
                 let next_token = self.get_token()?;
                 if let Token::Symbol(s) = next_token {
                     self.advance();
-                    Ok(Expr::RestOp(s))
+                    Ok(Expr::SpreadOp(s))
                 } else {
                     Err(ParsingError::UnexpectedToken(next_token))
                 }
@@ -366,9 +366,9 @@ mod test {
     }
 
     #[test]
-    fn parse_rest_operator() -> ParsingResult<()> {
+    fn parse_spread_operator() -> ParsingResult<()> {
         let mut p = parse("&rest");
-        assert_next_expr_eq!(p, Expr::RestOp("rest".to_string()));
+        assert_next_expr_eq!(p, Expr::SpreadOp("rest".to_string()));
 
         Ok(())
     }

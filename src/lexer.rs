@@ -46,7 +46,7 @@ pub enum Token {
     /// true, false
     BoolLiteral(bool),
     /// &rest
-    RestOp,
+    SpreadOp,
 }
 
 pub struct TokenIter<'a>(&'a mut Lexer);
@@ -138,7 +138,7 @@ impl Lexer {
         }
         if ch == '&' {
             self.advance()?;
-            return Ok(Token::RestOp);
+            return Ok(Token::SpreadOp);
         }
         if ch == '-' {
             self.advance()?;

@@ -46,7 +46,7 @@ pub enum Expr {
     Bool(bool),
     String(String),
     Symbol(String),
-    RestOp(String),
+    SpreadOp(String),
     Unit,
 }
 
@@ -101,7 +101,7 @@ impl Expr {
             Expr::Block(_) => "Block".to_string(),
             Expr::Symbol(_) => "Symbol".to_string(),
             Expr::Bool(_) => "Bool".to_string(),
-            Expr::RestOp(_) => "RestOp".to_string(),
+            Expr::SpreadOp(_) => "RestOp".to_string(),
             Expr::Unit => "Unit".to_string(),
         }
     }
@@ -150,6 +150,16 @@ impl Expr {
         match self {
             Expr::Block(b) => Ok(b),
             _ => Ok(vec![self]),
+        }
+    }
+
+    pub fn as_rest_op(self) -> Result<String, EvalError> {
+        match self {
+            Expr::SpreadOp(s) => Ok(s),
+            _ => Err(EvalError::TypeError {
+                expected: "RestOp".to_string(),
+                got: self.type_name(),
+            }),
         }
     }
 }
@@ -231,6 +241,16 @@ impl Value {
             Value::Bool(b) => Ok(b),
             _ => Err(EvalError::TypeError {
                 expected: "Bool".to_string(),
+                got: self.type_name(),
+            }),
+        }
+    }
+
+    pub fn as_list(self) -> Result<Rc<Vec<Value>>, EvalError> {
+        match self {
+            Value::List(l) => Ok(l),
+            _ => Err(EvalError::TypeError {
+                expected: "List".to_string(),
                 got: self.type_name(),
             }),
         }
@@ -578,12 +598,12 @@ mod test {
         Ok(())
     }
 
-    // #[test]
-    // fn eval_match_with_list_rest() -> ExprTestResult<()> {
-    //     let scope = scope();
-    //     let mut values = eval(scope.clone(), "(match [1 2 3] [ [x] (+ x 1) [x &rest] [x rest]])")?.into_iter();
-    //     assert_next_value_eq!(values, Value::List(Rc::new(vec![Value::Int(1), Value::List(Rc::new(vec![Value::Int(2), Value::Int(3)]))])));
-    //
-    //     Ok(())
-    // }
+    #[test]
+    fn eval_match_with_list_spread() -> ExprTestResult<()> {
+        let scope = scope();
+        let mut values = eval(scope.clone(), "(match [1 2 3] [ [x] (+ x 1) [x &rest] [x rest]])")?.into_iter();
+        assert_next_value_eq!(values, Value::List(Rc::new(vec![Value::Int(1), Value::List(Rc::new(vec![Value::Int(2), Value::Int(3)]))])));
+
+        Ok(())
+    }
 }

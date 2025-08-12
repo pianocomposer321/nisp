@@ -156,17 +156,58 @@ impl Scope {
             },
             (Expr::List(l), r) => {
                 if let Value::List(r) = r {
-                    if l.len() != r.len() {
+                    if l.len() > r.len() + 1 {
                         return Err(EvalError::PatternMatchDoesNotMatch {
                             left,
-                            right,
+                            right
                         });
                     }
-                    for (left, right) in l.iter().zip(r.iter()) {
-                        // dbg!(&left, &right);
-                        self.pattern_match_assign(left.clone(), right.clone())?;
+
+                    let mut found_rest = false;
+                    let mut rest_ind: Option<usize> = None;
+                    let mut rest_label: Option<String> = None;
+
+                    for ind in 0..l.len() {
+                        let left_expr = l[ind].clone();
+                        let right_val = r[ind].clone();
+
+                        if let Ok(rest) = left_expr.clone().as_rest_op() {
+                            found_rest = true;
+                            rest_ind = Some(ind);
+                            rest_label = Some(rest.clone());
+                            break;
+                        }
+
+                        self.pattern_match_assign(left_expr, right_val)?;
                     }
-                    // dbg!("matches!");
+
+                    if !found_rest {
+                        if l.len() != r.len() {
+                            return Err(EvalError::PatternMatchDoesNotMatch {
+                                left,
+                                right
+                            });
+                        }
+                        return Ok(());
+                    }
+
+                    let rest_ind = rest_ind.unwrap();
+                    let rest_label = rest_label.unwrap();
+                    let rest_len = (r.len() + 1) - l.len();
+                    let rest_end = rest_ind + rest_len;
+                    let mut rest_val = Vec::new();
+
+                    for ind in rest_ind..(rest_ind + rest_len) {
+                        rest_val.push(r[ind].clone());
+                    }
+                    self.set_value(&rest_label, Value::List(Rc::new(rest_val)));
+
+                    for ind in rest_end..r.len() {
+                        let left_expr = l[ind].clone();
+                        let right_val = r[ind].clone();
+                        self.pattern_match_assign(left_expr, right_val)?;
+                    }
+
                     Ok(())
                 } else {
                     Err(EvalError::PatternMatchDoesNotMatch {
