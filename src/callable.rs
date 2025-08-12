@@ -65,7 +65,6 @@ impl Builtin {
 
 static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
 
-#[derive(Debug)]
 pub struct FunctionDefn {
     args: Vec<Expr>,
     body: Vec<Expr>,
@@ -93,6 +92,12 @@ impl FunctionDefn {
 
     pub fn call(&self, scope: Scope) -> Result<Value, EvalError> {
         eval_block(scope, self.body.clone())
+    }
+}
+
+impl fmt::Debug for FunctionDefn {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "FunctionDefn({:?})", self.args)
     }
 }
 

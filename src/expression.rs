@@ -180,7 +180,7 @@ impl Value {
         match self {
             Value::String(s) => Ok(s),
             _ => Err(EvalError::TypeError {
-                expected: "String | Int | Unit".to_string(),
+                expected: "String".to_string(),
                 got: self.type_name(),
             }),
         }
@@ -219,6 +219,8 @@ impl Value {
 
 #[cfg(test)]
 mod test {
+    use std::fs::{read_to_string, File};
+
     use crate::callable::{default_builtins, default_intrinsics};
 
     use super::*;
@@ -471,10 +473,21 @@ mod test {
         Ok(())
     }
 
-    // #[test]
-    // fn eval_test_files() -> ExprTestResult<()> {
-    //     todo!()
-    // }
+    #[test]
+    fn eval_test_files() -> ExprTestResult<()> {
+        use walkdir::WalkDir;
+
+        for entry in WalkDir::new("tests").into_iter().filter(|e| !e.as_ref().unwrap().path().is_dir()) {
+            let contents = read_to_string(entry.unwrap().path()).unwrap();
+            let scope = scope();
+            eval(scope.clone(), contents.as_str())?;
+            let main = scope.get_value("main")?.as_function_defn()?;
+            main.call(scope.clone())?;
+        }
+
+        Ok(())
+    }
+
     #[test]
     fn eval_string_fn() -> ExprTestResult<()> {
         let scope = scope();

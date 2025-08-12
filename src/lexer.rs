@@ -96,68 +96,74 @@ impl Lexer {
     }
 
     pub fn get_next_token(&mut self) -> LexingResult<Token> {
+        while self.get_line()?.len() == 0 {
+            self.advance_line();
+        }
+
         while self.get_char()?.is_whitespace() {
-            self.advance();
+            self.advance()?;
         }
 
         let ch = self.get_char()?;
         if ch == ';' {
             self.advance_line();
+            return self.get_next_token();
         }
+
         if ch == '(' {
-            self.advance();
+            self.advance()?;
             return Ok(Token::OpenParen);
         }
         if ch == ')' {
-            self.advance();
+            self.advance()?;
             return Ok(Token::CloseParen);
         }
         if ch == '[' {
-            self.advance();
+            self.advance()?;
             return Ok(Token::OpenBracket);
         }
         if ch == ']' {
-            self.advance();
+            self.advance()?;
             return Ok(Token::CloseBracket);
         }
         if ch == '{' {
-            self.advance();
+            self.advance()?;
             return Ok(Token::OpenBrace);
         }
         if ch == '}' {
-            self.advance();
+            self.advance()?;
             return Ok(Token::CloseBrace);
         }
         if matches!(ch, '0'..'9') {
             let number: String = self
-                .get_slice_until_or_end(|c| !matches!(c, '0'..'9'))
+                .get_slice_until_or_end(|c| !matches!(c, '0'..'9'))?
                 .iter()
                 .collect();
-            self.advance_by(number.len());
+            self.advance_by(number.len())?;
             return Ok(Token::IntLiteral(number.parse()?));
         }
         if matches!(ch, '"') {
-            self.advance();
+            self.advance()?;
             let string: String = self.get_slice_until(|c| c == '"')?.iter().collect();
-            self.advance_by(string.len());
-            self.advance();
+            self.advance_by(string.len())?;
+            self.advance()?;
             return Ok(Token::StringLiteral(string));
         }
-            self.advance_by(4);
         if self.get_slice_until_or_end(|c| c.is_whitespace() || matches!(c, ')' | ']' | '}'))? == ['t', 'r', 'u', 'e'] {
+            self.advance_by(4)?;
             return Ok(Token::BoolLiteral(true));
         }
-            self.advance_by(5);
         if self.get_slice_until_or_end(|c| c.is_whitespace() || matches!(c, ')' | ']' | '}'))? == ['f', 'a', 'l', 's', 'e'] {
+            self.advance_by(5)?;
             return Ok(Token::BoolLiteral(false));
         }
 
         // Assume anything else is a symbol
         let symbol: String = self
-            .get_slice_until_or_end(|c| c.is_whitespace() || matches!(c, ')' | ']' | '}'))
+            .get_slice_until_or_end(|c| c.is_whitespace() || matches!(c, ')' | ']' | '}'))?
             .iter()
             .collect();
-        self.advance_by(symbol.len());
+        self.advance_by(symbol.len())?;
         Ok(Token::Symbol(symbol))
     }
 
@@ -173,9 +179,13 @@ impl Lexer {
         self.get_slice(self.find(pred)? - 1)
     }
 
-    fn get_slice_until_or_end(&self, pred: impl Fn(char) -> bool) -> &[char] {
+    fn get_slice_until_or_end(&self, pred: impl Fn(char) -> bool) -> LexingResult<&[char]> {
         // Safe to unwrap because find_or_end always returns an in-bounds index
-        self.get_slice(self.find_or_end(pred) - 1).unwrap()
+        let offset = self.find_or_end(pred)?;
+        if offset == 0 {
+            return Ok(&[]);
+        }
+        self.get_slice(offset - 1)
     }
 
     /// Returns the offset of the first char for which pred(char) is true, starting at
@@ -198,24 +208,24 @@ impl Lexer {
 
     /// Returns the offset of the first char for which pred(char) is true, or the offset that is
     /// one past the end of self.input.
-    fn find_or_end(&self, pred: impl Fn(char) -> bool) -> usize {
-        self.find(pred).unwrap_or(self.offset_to_end())
+    fn find_or_end(&self, pred: impl Fn(char) -> bool) -> LexingResult<usize> {
+        Ok(self.find(pred).unwrap_or(self.offset_to_end()?))
     }
 
-    fn find_or_end_at(&self, offset: usize, pred: impl Fn(char) -> bool) -> usize {
-        self.find_at(offset, pred).unwrap_or(self.offset_to_end())
+    fn find_or_end_at(&self, offset: usize, pred: impl Fn(char) -> bool) -> LexingResult<usize> {
+        Ok(self.find_at(offset, pred).unwrap_or(self.offset_to_end()?))
     }
 
     fn get_slice_at(&self, smaller: usize, larger: usize) -> LexingResult<&[char]> {
-        if self.col + larger >= self.get_line().len() {
+        if self.col + larger >= self.get_line()?.len() {
             Err(LexingError::EOF)
         } else {
             Ok(&self.input[self.line][self.col + smaller..=self.col + larger])
         }
     }
 
-    fn get_line(&self) -> &[char] {
-        &self.input[self.line]
+    fn get_line(&self) -> LexingResult<&[char]> {
+        self.input.get(self.line).map(|s| s.as_slice()).ok_or(LexingError::EOF)
     }
 
     fn get_char(&self) -> LexingResult<char> {
@@ -227,8 +237,8 @@ impl Lexer {
             return Err(LexingError::EOF);
         }
 
-        if self.col + offset >= self.get_line().len() {
-            Err(LexingError::EOF)
+        if self.col + offset >= self.get_line()?.len() {
+            Err(LexingError::EOL)
         } else {
             Ok(self.input[self.line][self.col + offset])
         }
@@ -238,16 +248,18 @@ impl Lexer {
         self.input.len()
     }
 
-    fn offset_to_end(&self) -> usize {
-        self.get_line().len() - self.col
+    fn offset_to_end(&self) -> LexingResult<usize> {
+        Ok(self.get_line()?.len() - self.col)
     }
 
-    fn advance(&mut self) {
+    fn advance(&mut self) -> LexingResult<()> {
         self.col += 1;
-        if self.col >= self.get_line().len() {
+        if self.col >= self.get_line()?.len() {
             self.col = 0;
             self.line += 1;
         }
+
+        Ok(())
     }
 
     fn advance_line(&mut self) {
@@ -255,27 +267,25 @@ impl Lexer {
         self.col = 0;
     }
 
-    fn advance_by(&mut self, offset: usize) {
+    fn advance_by(&mut self, offset: usize) -> LexingResult<()> {
         self.col += offset;
-        if self.col >= self.get_line().len() {
-            let diff = self.col - self.get_line().len();
+        if self.col >= self.get_line()?.len() {
+            let diff = self.col - self.get_line()?.len();
             self.line += 1;
             self.col = diff;
         }
+
+        Ok(())
     }
 
-    fn advance_until(&mut self, pred: impl Fn(char) -> bool) {
-        let mut ch = match self.get_char() {
-            Ok(ch) => ch,
-            Err(_) => return,
-        };
+    fn advance_until(&mut self, pred: impl Fn(char) -> bool) -> LexingResult<()> {
+        let mut ch = self.get_char()?;
         while !pred(ch) {
-            self.advance();
-            ch = match self.get_char() {
-                Ok(ch) => ch,
-                Err(_) => return,
-            };
+            self.advance()?;
+            ch = self.get_char()?;
         }
+
+        Ok(())
     }
 }
 

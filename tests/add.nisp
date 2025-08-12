@@ -1,0 +1,12 @@
+(defn f [a b] {
+  (+ a b)
+})
+
+(defn main [] {
+  (assert (= (f 1 2) 3))
+  (assert (= (f 2 3) 5))
+  (assert (= (f 3 -1) 2))
+  (assert (= (f -1 -1) -2))
+  (assert (= (f -1 1) 0))
+  (assert (= (f 0 0) 0))
+})
