@@ -4,7 +4,7 @@ use std::{
 };
 
 use crate::{
-    expression::{EvalError, Expr, Value},
+    expression::{eval_block, EvalError, Expr, Value},
     scope::Scope,
 };
 
@@ -92,8 +92,7 @@ impl FunctionDefn {
     }
 
     pub fn call(&self, scope: Scope) -> Result<Value, EvalError> {
-        let values = Expr::values(scope.clone(), self.body.clone())?;
-        Ok(values.into_iter().last().unwrap_or(Value::Unit).clone())
+        eval_block(scope, self.body.clone())
     }
 }
 

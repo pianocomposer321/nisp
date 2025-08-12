@@ -4,6 +4,11 @@ use thiserror::Error;
 
 use crate::{callable::FunctionDefn, scope::{Scope, ScopeError}};
 
+pub fn eval_block(scope: Scope, exprs: Vec<Expr>) -> Result<Value, EvalError> {
+    let values = Expr::values(scope.clone(), exprs)?;
+    Ok(values.into_iter().last().unwrap_or(Value::Unit))
+}
+
 #[derive(Error, Debug)]
 pub enum EvalError {
     #[error("Type error: expected {expected:?} but got {got:?}")]
@@ -45,6 +50,7 @@ impl Expr {
                 if let Some(intrinsic) = scope.get_intrinsic(&name) {
                     return intrinsic.call(scope, args);
                 }
+
                 let function = scope.get_value(&name)?.as_function_defn()?;
                 child_scope.pattern_match_assign(function.args(), args)?;
                 function.call(child_scope.clone())
@@ -56,12 +62,7 @@ impl Expr {
                 todo!()
             }
             Expr::Bool(b) => Ok(Value::Bool(b)),
-            Expr::Block(b) => {
-                let child_scope = Scope::child(scope.clone());
-                let values = Expr::values(child_scope.clone(), b)?;
-
-                Ok(values.into_iter().last().unwrap_or(Value::Unit))
-            }
+            Expr::Block(b) => eval_block(Scope::child(scope), b),
             _ => todo!(),
         }
     }
