@@ -134,18 +134,29 @@ impl Lexer {
             self.advance()?;
             return Ok(Token::CloseBrace);
         }
-        if matches!(ch, '-' | '0'..'9') {
-            if ch == '-' {
-                self.advance()?;
+        if ch == '-' {
+            self.advance()?;
+            let next = self.get_slice_until_or_end(|c| !matches!(c, '0'..'9'));
+            if matches!(next, Err(LexingError::EOF) | Err(LexingError::EOL)) {
+                return Ok(Token::Symbol("-".to_string()));
             }
-            let mut number: String = self
+            let next = next?;
+
+            if next.len() > 0 {
+                let number: String = next.iter().collect();
+                dbg!(&number);
+                self.advance_by(number.len())?;
+                let parsed = number.parse::<i64>()?;
+                return Ok(Token::IntLiteral(parsed * -1));
+            }
+            return Ok(Token::Symbol("-".to_string()));
+        }
+        if matches!(ch, '0'..'9') {
+            let number: String = self
                 .get_slice_until_or_end(|c| !matches!(c, '0'..'9'))?
                 .iter()
                 .collect();
             self.advance_by(number.len())?;
-            if ch == '-' {
-                number = format!("-{}", number);
-            }
             return Ok(Token::IntLiteral(number.parse()?));
         }
         if matches!(ch, '"') {
@@ -291,6 +302,26 @@ impl Lexer {
             ch = self.get_char()?;
         }
 
+        Ok(())
+    }
+
+    fn backup(&mut self) -> LexingResult<()> {
+        if self.col > 0 {
+            self.col -= 1;
+        } else if self.line > 0 {
+            self.line -= 1;
+            self.col = self.get_line()?.len() - 1;
+        }
+        Ok(())
+    }
+
+    fn backup_by(&mut self, n: usize) -> LexingResult<()> {
+        if self.col > n {
+            self.col -= n;
+        } else if self.line > 0 {
+            self.line -= 1;
+            self.col = self.get_line()?.len() - n;
+        }
         Ok(())
     }
 }
@@ -515,6 +546,15 @@ mod test {
     fn lex_negative_number() -> LexingResult<()> {
         let mut l = lex("-1");
         assert_next_token_eq!(&mut l, Token::IntLiteral(-1));
+        assert_eof!(&mut l);
+
+        Ok(())
+    }
+
+    #[test]
+    fn lex_sub() -> LexingResult<()> {
+        let mut l = lex("-");
+        assert_next_token_eq!(&mut l, Token::Symbol("-".to_string()));
         assert_eof!(&mut l);
 
         Ok(())
