@@ -168,6 +168,21 @@ pub mod default_builtins {
         Ok(Value::Bool(left == right))
     }
 
+    fn sub(vals: Vec<Value>) -> Result<Value, EvalError> {
+        let mut iter = vals.into_iter();
+
+        let mut diff = iter.next().ok_or(EvalError::NotEnoughArgs {
+            expected: 2,
+            got: 0,
+        })?.as_int()?;
+
+        for value in iter {
+            diff -= value.as_int()?;
+        }
+
+        Ok(Value::Int(diff))
+    }
+
     fn assert(vals: Vec<Value>) -> Result<Value, EvalError> {
         let iter = vals.into_iter();
 
@@ -187,9 +202,12 @@ pub mod default_builtins {
     pub fn builtins() -> HashMap<String, Rc<Builtin>> {
         HashMap::from([
             make_builtin("+", add),
-            make_builtin("print", print),
+            make_builtin("add", add),
+            make_builtin("-", sub),
+            make_builtin("sub", sub),
             make_builtin("=", eq),
             make_builtin("eq", eq),
+            make_builtin("print", print),
             make_builtin("assert", assert),
         ])
     }

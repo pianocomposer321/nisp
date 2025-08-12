@@ -395,4 +395,24 @@ mod test {
         assert!(matches!(values.unwrap_err(), ExprTestError::EvalError(EvalError::AssertionFailed)));
         Ok(())
     }
+
+    #[test]
+    fn eval_sub() -> ExprTestResult<()> {
+        let scope = scope();
+        let mut values = eval(scope.clone(), "(- 1 2)")?.into_iter();
+        assert_next_value_eq!(values, Value::Int(-1));
+
+        let mut values = eval(scope.clone(), "(- 1 2 3)")?.into_iter();
+        assert_next_value_eq!(values, Value::Int(-4));
+
+        let mut values = eval(scope.clone(), "(- 2 1)")?.into_iter();
+        assert_next_value_eq!(values, Value::Int(1));
+
+        Ok(())
+    }
+
+    // #[test]
+    // fn eval_test_files() -> ExprTestResult<()> {
+    //     todo!()
+    // }
 }
