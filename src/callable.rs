@@ -58,8 +58,8 @@ impl Builtin {
         }
     }
 
-    pub fn call(&self, scope: Scope, args: Vec<Value>) -> Result<Value, EvalError> {
-        (self.body.0)(scope, args)
+    pub fn call(&self, args: Vec<Value>) -> Result<Value, EvalError> {
+        (self.body.0)(args)
     }
 }
 
@@ -103,8 +103,8 @@ impl PartialEq for FunctionDefn {
     }
 }
 
-pub trait BuiltinBodyFn: Fn(Scope, Vec<Value>) -> Result<Value, EvalError> + 'static {}
-impl<T> BuiltinBodyFn for T where T: Fn(Scope, Vec<Value>) -> Result<Value, EvalError> + 'static {}
+pub trait BuiltinBodyFn: Fn(Vec<Value>) -> Result<Value, EvalError> + 'static {}
+impl<T> BuiltinBodyFn for T where T: Fn(Vec<Value>) -> Result<Value, EvalError> + 'static {}
 
 pub struct FunctionBody(Box<dyn BuiltinBodyFn>);
 
@@ -125,7 +125,7 @@ pub mod default_builtins {
 
     use super::*;
 
-    fn add(_: Scope, vals: Vec<Value>) -> Result<Value, EvalError> {
+    fn add(vals: Vec<Value>) -> Result<Value, EvalError> {
         let mut sum: i64 = 0;
         for v in vals {
             sum += v.as_int()? as i64;
@@ -133,7 +133,7 @@ pub mod default_builtins {
         Ok(Value::Int(sum))
     }
 
-    fn print(_: Scope, vals: Vec<Value>) -> Result<Value, EvalError> {
+    fn print(vals: Vec<Value>) -> Result<Value, EvalError> {
         let mut iter = vals.into_iter();
         let value = iter
             .next()
@@ -152,6 +152,23 @@ pub mod default_builtins {
         Ok(Value::Unit)
     }
 
+    fn eq(vals: Vec<Value>) -> Result<Value, EvalError> {
+        let mut iter = vals.into_iter();
+        let left = iter
+            .next()
+            .ok_or(EvalError::NotEnoughArgs {
+                expected: 2,
+                got: 0,
+            })?;
+        let right = iter
+            .next()
+            .ok_or(EvalError::NotEnoughArgs {
+                expected: 2,
+                got: 1,
+            })?;
+        Ok(Value::Bool(left == right))
+    }
+
     fn make_builtin(name: &str, body: impl BuiltinBodyFn) -> (String, Rc<Builtin>) {
         (name.to_string(), Rc::new(Builtin::new(name, FunctionBody::new(body))))
     }
@@ -160,6 +177,8 @@ pub mod default_builtins {
         HashMap::from([
             make_builtin("+", add),
             make_builtin("print", print),
+            make_builtin("=", eq),
+            make_builtin("eq", eq),
         ])
     }
 }

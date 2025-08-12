@@ -40,7 +40,7 @@ impl Expr {
                 let mut child_scope = Scope::child(scope.clone());
                 if let Some(builtin) = scope.get_builtin(&name) {
                     let values = Expr::values(child_scope.clone(), args)?;
-                    return builtin.call(scope, values);
+                    return builtin.call(values);
                 }
                 if let Some(intrinsic) = scope.get_intrinsic(&name) {
                     return intrinsic.call(scope, args);
@@ -341,6 +341,18 @@ mod test {
 
         let mut values = eval(scope.clone(), "(if false 1 2)")?.into_iter();
         assert_next_value_eq!(values, Value::Int(2));
+
+        Ok(())
+    }
+
+    #[test]
+    fn eval_eq() -> ExprTestResult<()> {
+        let scope = scope();
+        let mut values = eval(scope.clone(), "(= 1 1)")?.into_iter();
+        assert_next_value_eq!(values, Value::Bool(true));
+
+        let mut values = eval(scope.clone(), "(= 1 2)")?.into_iter();
+        assert_next_value_eq!(values, Value::Bool(false));
 
         Ok(())
     }
