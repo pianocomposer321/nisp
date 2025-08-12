@@ -134,12 +134,18 @@ impl Lexer {
             self.advance()?;
             return Ok(Token::CloseBrace);
         }
-        if matches!(ch, '0'..'9') {
-            let number: String = self
+        if matches!(ch, '-' | '0'..'9') {
+            if ch == '-' {
+                self.advance()?;
+            }
+            let mut number: String = self
                 .get_slice_until_or_end(|c| !matches!(c, '0'..'9'))?
                 .iter()
                 .collect();
             self.advance_by(number.len())?;
+            if ch == '-' {
+                number = format!("-{}", number);
+            }
             return Ok(Token::IntLiteral(number.parse()?));
         }
         if matches!(ch, '"') {
@@ -500,6 +506,15 @@ mod test {
 
         let mut l = lex("false");
         assert_next_token_eq!(&mut l, Token::BoolLiteral(false));
+        assert_eof!(&mut l);
+
+        Ok(())
+    }
+
+    #[test]
+    fn lex_negative_number() -> LexingResult<()> {
+        let mut l = lex("-1");
+        assert_next_token_eq!(&mut l, Token::IntLiteral(-1));
         assert_eof!(&mut l);
 
         Ok(())
