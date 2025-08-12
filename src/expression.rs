@@ -56,6 +56,12 @@ impl Expr {
                 todo!()
             }
             Expr::Bool(b) => Ok(Value::Bool(b)),
+            Expr::Block(b) => {
+                let child_scope = Scope::child(scope.clone());
+                let values = Expr::values(child_scope.clone(), b)?;
+
+                Ok(values.into_iter().last().unwrap_or(Value::Unit))
+            }
             _ => todo!(),
         }
     }
@@ -363,6 +369,16 @@ mod test {
         let mut values = eval(scope.clone(), "(defn f [x] (if (= x 10) 10 (f (+ x 1)))) (f 1)")?.into_iter();
         assert_next_value_eq!(values, Value::Unit);
         assert_next_value_eq!(values, Value::Int(10));
+
+        Ok(())
+    }
+
+    #[test]
+    fn eval_block() -> ExprTestResult<()> {
+        let scope = scope();
+        let mut values = eval(scope.clone(), "(set x { 1 2 3 }) x")?.into_iter();
+        assert_next_value_eq!(values, Value::Unit);
+        assert_next_value_eq!(values, Value::Int(3));
 
         Ok(())
     }
