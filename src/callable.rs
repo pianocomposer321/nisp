@@ -220,6 +220,35 @@ pub mod default_intrinsics {
         Ok(Value::Unit)
     }
 
+    fn if_(scope: Scope, exprs: Vec<Expr>) -> Result<Value, EvalError> {
+        let mut iter = exprs.into_iter();
+        let condition = iter
+            .next()
+            .ok_or(EvalError::NotEnoughArgs {
+                expected: 3,
+                got: 0,
+            })?
+            .eval(scope.clone())?;
+        let left = iter
+            .next()
+            .ok_or(EvalError::NotEnoughArgs {
+                expected: 3,
+                got: 1,
+            })?;
+        let right = iter
+            .next()
+            .ok_or(EvalError::NotEnoughArgs {
+                expected: 3,
+                got: 2,
+            })?;
+
+        if condition.as_bool()? {
+            left.eval(scope.clone())
+        } else {
+            right.eval(scope.clone())
+        }
+    }
+
     fn make_intrinsic(name: &str, body: impl IntrinsicBodyFn) -> (String, Rc<Intrinsic>) {
         (name.to_string(), Rc::new(Intrinsic::new(name, IntrinsicBody::new(body))))
     }
@@ -228,6 +257,7 @@ pub mod default_intrinsics {
         HashMap::from([
             make_intrinsic("set", set),
             make_intrinsic("defn", defn),
+            make_intrinsic("if", if_),
         ])
     }
 }

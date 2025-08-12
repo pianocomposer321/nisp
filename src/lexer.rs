@@ -43,6 +43,8 @@ pub enum Token {
     IntLiteral(i64),
     /// "string"
     StringLiteral(String),
+    /// true, false
+    BoolLiteral(bool),
 }
 
 pub struct TokenIter<'a>(&'a mut Lexer);
@@ -140,6 +142,14 @@ impl Lexer {
             self.advance_by(string.len());
             self.advance();
             return Ok(Token::StringLiteral(string));
+        }
+        if self.get_slice_until_or_end(|c| c.is_whitespace()) == ['t', 'r', 'u', 'e'] {
+            self.advance_by(4);
+            return Ok(Token::BoolLiteral(true));
+        }
+        if self.get_slice_until_or_end(|c| c.is_whitespace()) == ['f', 'a', 'l', 's', 'e'] {
+            self.advance_by(5);
+            return Ok(Token::BoolLiteral(false));
         }
 
         // Assume anything else is a symbol
@@ -467,6 +477,19 @@ mod test {
         assert_next_token_eq!(&mut l, Token::IntLiteral(2));
         assert_next_token_eq!(&mut l, Token::IntLiteral(3));
         assert_next_token_eq!(&mut l, Token::CloseBrace);
+        assert_eof!(&mut l);
+
+        Ok(())
+    }
+
+    #[test]
+    fn lex_bool() -> LexingResult<()> {
+        let mut l = lex("true");
+        assert_next_token_eq!(&mut l, Token::BoolLiteral(true));
+        assert_eof!(&mut l);
+
+        let mut l = lex("false");
+        assert_next_token_eq!(&mut l, Token::BoolLiteral(false));
         assert_eof!(&mut l);
 
         Ok(())

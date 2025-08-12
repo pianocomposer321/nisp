@@ -14,6 +14,9 @@ pub enum EvalError {
     ScopeError(#[from] ScopeError),
     #[error("Pattern match length mismatch: expected {expected:?} but got {got:?}")]
     PatternMatchLengthMismatch { expected: usize, got: usize },
+
+    #[error("Undefined variable: {name}")]
+    UndefinedVariable { name: String },
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -22,6 +25,7 @@ pub enum Expr {
     List(Vec<Expr>),
     Block(Vec<Expr>),
     Int(i64),
+    Bool(bool),
     String(String),
     Symbol(String),
     Unit,
@@ -41,7 +45,6 @@ impl Expr {
                 if let Some(intrinsic) = scope.get_intrinsic(&name) {
                     return intrinsic.call(scope, args);
                 }
-
                 let function = scope.get_value(&name)?.as_function_defn()?;
                 child_scope.pattern_match_assign(function.args(), args)?;
                 function.call(child_scope.clone())
@@ -52,6 +55,7 @@ impl Expr {
                 }
                 todo!()
             }
+            Expr::Bool(b) => Ok(Value::Bool(b)),
             _ => todo!(),
         }
     }
@@ -71,6 +75,7 @@ impl Expr {
             Expr::List(_) => "List".to_string(),
             Expr::Block(_) => "Block".to_string(),
             Expr::Symbol(_) => "Symbol".to_string(),
+            Expr::Bool(_) => "Bool".to_string(),
             Expr::Unit => "Unit".to_string(),
         }
     }
@@ -132,6 +137,7 @@ pub enum Value {
     Int(i64),
     String(Rc<String>),
     FunctionDefn(Rc<FunctionDefn>),
+    Bool(bool),
     Unit,
 }
 
@@ -141,6 +147,7 @@ impl ToString for Value {
             Value::Int(i) => i.to_string(),
             Value::String(s) => s.to_string(),
             Value::FunctionDefn(d) => d.to_string(),
+            Value::Bool(b) => b.to_string(),
             Value::Unit => "()".to_string(),
         }
     }
@@ -171,11 +178,21 @@ impl Value {
         }
     }
 
-    fn as_function_defn(self) -> Result<Rc<FunctionDefn>, EvalError> {
+    pub fn as_function_defn(self) -> Result<Rc<FunctionDefn>, EvalError> {
         match self {
             Value::FunctionDefn(f) => Ok(f),
             _ => Err(EvalError::TypeError {
                 expected: "FunctionDefn".to_string(),
+                got: self.type_name(),
+            }),
+        }
+    }
+
+    pub fn as_bool(self) -> Result<bool, EvalError> {
+        match self {
+            Value::Bool(b) => Ok(b),
+            _ => Err(EvalError::TypeError {
+                expected: "Bool".to_string(),
                 got: self.type_name(),
             }),
         }
@@ -186,6 +203,7 @@ impl Value {
             Value::Int(_) => "Int".to_string(),
             Value::String(_) => "String".to_string(),
             Value::FunctionDefn(_) => "FunctionDefn".to_string(),
+            Value::Bool(_) => "Bool".to_string(),
             Value::Unit => "Unit".to_string(),
         }
     }
@@ -280,13 +298,6 @@ mod test {
     }
 
     #[test]
-    fn eval_print() -> Result<(), ()> {
-        let scope = scope();
-        let mut values = eval(scope.clone(), "(print \"hello\")").unwrap().into_iter();
-        assert_next_value_eq!(values, Value::Unit);
-
-        let mut values = eval(scope.clone(), "(print \"hello\" \"world\")").unwrap().into_iter();
-        assert_next_value_eq!(values, Value::Unit);
     fn eval_print() -> ExprTestResult<()> {
         let scope = scope();
         let mut values = eval(scope.clone(), "(print \"hello\")")?.into_iter();
@@ -321,6 +332,15 @@ mod test {
 
         Ok(())
     }
+
+    #[test]
+    fn eval_if() -> ExprTestResult<()> {
+        let scope = scope();
+        let mut values = eval(scope.clone(), "(if true 1 2)")?.into_iter();
+        assert_next_value_eq!(values, Value::Int(1));
+
+        let mut values = eval(scope.clone(), "(if false 1 2)")?.into_iter();
+        assert_next_value_eq!(values, Value::Int(2));
 
         Ok(())
     }

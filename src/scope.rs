@@ -7,8 +7,8 @@ use std::{
 use thiserror::Error;
 
 use crate::{
-    callable::{Builtin, FunctionBody, FunctionBodyFn, Intrinsic, IntrinsicBody, IntrinsicBodyFn},
-    expression::Value,
+    callable::{Builtin, BuiltinBodyFn, FunctionBody, Intrinsic, IntrinsicBody, IntrinsicBodyFn},
+    expression::{EvalError, Expr, Value},
 };
 
 #[derive(Error, Debug)]
@@ -27,7 +27,7 @@ pub struct Scope {
 
 impl Scope {
     pub fn new(
-        builtins: Vec<(&str, Box<dyn FunctionBodyFn>)>,
+        builtins: Vec<(&str, Box<dyn BuiltinBodyFn>)>,
         intrinsics: Vec<(&str, Box<dyn IntrinsicBodyFn>)>,
     ) -> Self {
         let mut builtins_ = HashMap::new();
@@ -81,15 +81,15 @@ impl Scope {
         self.intrinsics.get(name).cloned()
     }
 
-    pub fn get_value(&self, name: &str) -> Option<Value> {
+    pub fn get_value(&self, name: &str) -> Result<Value, EvalError> {
         if let Some(value) = self.values.borrow().get(name).cloned() {
-            Some(value)
+            Ok(value)
         } else if let Some(parent) = &self.parent
-            && let Some(value) = parent.borrow().get_value(name)
+            && let Ok(value) = parent.borrow().get_value(name)
         {
-            Some(value)
+            Ok(value)
         } else {
-            None
+            Err(EvalError::UndefinedVariable { name: name.to_string() })
         }
     }
 
@@ -104,6 +104,26 @@ impl Scope {
             Ok(())
         } else {
             Err(ScopeError::NoParent)
+        }
+    }
+
+    // TODO: this will be more complicated later
+    pub fn pattern_match_assign(&mut self, left: &[Expr], right: Vec<Expr>) -> Result<(), EvalError> {
+        if left.len() != right.len() {
+            return Err(EvalError::PatternMatchLengthMismatch {
+                expected: left.len(),
+                got: right.len(),
+            });
+        } else {
+            for (l, r) in left.into_iter().zip(right.into_iter()) {
+                match (l, r) {
+                    (Expr::Symbol(l), r) => {
+                        self.set_value(&l, r.eval(self.clone())?);
+                    }
+                    _ => todo!(),
+                }
+            }
+            Ok(())
         }
     }
 }

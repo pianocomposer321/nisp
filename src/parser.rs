@@ -120,6 +120,10 @@ impl Parser {
                     Ok(Expr::Block(exprs))
                 }
             }
+            Token::BoolLiteral(b) => {
+                self.advance();
+                Ok(Expr::Bool(b))
+            }
             _ => {
                 self.advance();
                 Err(ParsingError::UnexpectedToken(token))
@@ -321,6 +325,25 @@ mod test {
                 ]
             )
         );
+
+        Ok(())
+    }
+
+    #[test]
+    fn parse_bool() -> ParsingResult<()> {
+        let mut p = parse("true");
+        assert_next_expr_eq!(p, Expr::Bool(true));
+
+        let mut p = parse("false");
+        assert_next_expr_eq!(p, Expr::Bool(false));
+
+        Ok(())
+    }
+
+    #[test]
+    fn parse_if() -> ParsingResult<()> {
+        let mut p = parse("(if true 1 2)");
+        assert_next_expr_eq!(p, Expr::Call("if".to_string(), vec![Expr::Bool(true), Expr::Int(1), Expr::Int(2)]));
 
         Ok(())
     }
