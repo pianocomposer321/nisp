@@ -183,6 +183,74 @@ pub mod default_builtins {
         Ok(Value::Int(diff))
     }
 
+    fn geq(vals: Vec<Value>) -> Result<Value, EvalError> {
+        let mut iter = vals.into_iter();
+        let left = iter
+            .next()
+            .ok_or(EvalError::NotEnoughArgs {
+                expected: 2,
+                got: 0,
+            })?;
+        let right = iter
+            .next()
+            .ok_or(EvalError::NotEnoughArgs {
+                expected: 2,
+                got: 1,
+            })?;
+        Ok(Value::Bool(left.as_int()? >= right.as_int()?))
+    }
+
+    fn leq(vals: Vec<Value>) -> Result<Value, EvalError> {
+        let mut iter = vals.into_iter();
+        let left = iter
+            .next()
+            .ok_or(EvalError::NotEnoughArgs {
+                expected: 2,
+                got: 0,
+            })?;
+        let right = iter
+            .next()
+            .ok_or(EvalError::NotEnoughArgs {
+                expected: 2,
+                got: 1,
+            })?;
+        Ok(Value::Bool(left.as_int()? <= right.as_int()?))
+    }
+
+    fn gt(vals: Vec<Value>) -> Result<Value, EvalError> {
+        let mut iter = vals.into_iter();
+        let left = iter
+            .next()
+            .ok_or(EvalError::NotEnoughArgs {
+                expected: 2,
+                got: 0,
+            })?;
+        let right = iter
+            .next()
+            .ok_or(EvalError::NotEnoughArgs {
+                expected: 2,
+                got: 1,
+            })?;
+        Ok(Value::Bool(left.as_int()? > right.as_int()?))
+    }
+
+    fn lt(vals: Vec<Value>) -> Result<Value, EvalError> {
+        let mut iter = vals.into_iter();
+        let left = iter
+            .next()
+            .ok_or(EvalError::NotEnoughArgs {
+                expected: 2,
+                got: 0,
+            })?;
+        let right = iter
+            .next()
+            .ok_or(EvalError::NotEnoughArgs {
+                expected: 2,
+                got: 1,
+            })?;
+        Ok(Value::Bool(left.as_int()? < right.as_int()?))
+    }
+
     fn assert(vals: Vec<Value>) -> Result<Value, EvalError> {
         let iter = vals.into_iter();
 
@@ -207,6 +275,14 @@ pub mod default_builtins {
             make_builtin("sub", sub),
             make_builtin("=", eq),
             make_builtin("eq", eq),
+            make_builtin(">=", geq),
+            make_builtin("geq", geq),
+            make_builtin("<=", leq),
+            make_builtin("leq", leq),
+            make_builtin(">", gt),
+            make_builtin("gt", gt),
+            make_builtin("<", lt),
+            make_builtin("lt", lt),
             make_builtin("print", print),
             make_builtin("assert", assert),
         ])

@@ -411,6 +411,66 @@ mod test {
         Ok(())
     }
 
+    #[test]
+    fn eval_geq() -> ExprTestResult<()> {
+        let scope = scope();
+        let mut values = eval(scope.clone(), "(>= 1 1)")?.into_iter();
+        assert_next_value_eq!(values, Value::Bool(true));
+
+        let mut values = eval(scope.clone(), "(>= 1 2)")?.into_iter();
+        assert_next_value_eq!(values, Value::Bool(false));
+
+        let mut values = eval(scope.clone(), "(>= 2 1)")?.into_iter();
+        assert_next_value_eq!(values, Value::Bool(true));
+
+        Ok(())
+    }
+
+    #[test]
+    fn eval_leq() -> ExprTestResult<()> {
+        let scope = scope();
+        let mut values = eval(scope.clone(), "(<= 1 1)")?.into_iter();
+        assert_next_value_eq!(values, Value::Bool(true));
+
+        let mut values = eval(scope.clone(), "(<= 1 2)")?.into_iter();
+        assert_next_value_eq!(values, Value::Bool(true));
+
+        let mut values = eval(scope.clone(), "(<= 2 1)")?.into_iter();
+        assert_next_value_eq!(values, Value::Bool(false));
+
+        Ok(())
+    }
+
+    #[test]
+    fn eval_gt() -> ExprTestResult<()> {
+        let scope = scope();
+        let mut values = eval(scope.clone(), "(> 1 1)")?.into_iter();
+        assert_next_value_eq!(values, Value::Bool(false));
+
+        let mut values = eval(scope.clone(), "(> 1 2)")?.into_iter();
+        assert_next_value_eq!(values, Value::Bool(false));
+
+        let mut values = eval(scope.clone(), "(> 2 1)")?.into_iter();
+        assert_next_value_eq!(values, Value::Bool(true));
+
+        Ok(())
+    }
+
+    #[test]
+    fn eval_lt() -> ExprTestResult<()> {
+        let scope = scope();
+        let mut values = eval(scope.clone(), "(< 1 1)")?.into_iter();
+        assert_next_value_eq!(values, Value::Bool(false));
+
+        let mut values = eval(scope.clone(), "(< 1 2)")?.into_iter();
+        assert_next_value_eq!(values, Value::Bool(true));
+
+        let mut values = eval(scope.clone(), "(< 2 1)")?.into_iter();
+        assert_next_value_eq!(values, Value::Bool(false));
+
+        Ok(())
+    }
+
     // #[test]
     // fn eval_test_files() -> ExprTestResult<()> {
     //     todo!()
