@@ -569,7 +569,7 @@ mod test {
     #[test]
     fn lex_rest_operator() -> LexingResult<()> {
         let mut l = lex("&rest");
-        assert_next_token_eq!(&mut l, Token::RestOp);
+        assert_next_token_eq!(&mut l, Token::SpreadOp);
         assert_next_token_eq!(&mut l, Token::Symbol("rest".to_string()));
         assert_eof!(&mut l);
 
@@ -580,7 +580,7 @@ mod test {
     fn lex_rest_operator_in_list() -> LexingResult<()> {
         let mut l = lex("[&rest]");
         assert_next_token_eq!(&mut l, Token::OpenBracket);
-        assert_next_token_eq!(&mut l, Token::RestOp);
+        assert_next_token_eq!(&mut l, Token::SpreadOp);
         assert_next_token_eq!(&mut l, Token::Symbol("rest".to_string()));
         assert_next_token_eq!(&mut l, Token::CloseBracket);
         assert_eof!(&mut l);

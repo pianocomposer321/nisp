@@ -279,6 +279,29 @@ pub mod default_builtins {
         Ok(Value::String(Rc::new(value.to_string())))
     }
 
+    // TODO: make this return any value rather than just a bool
+    fn and(vals: Vec<Value>) -> Result<Value, EvalError> {
+        let mut res = true;
+        for v in vals {
+            res = res && v.as_bool()?;
+            if !res {
+                break;
+            }
+        }
+        Ok(Value::Bool(res))
+    }
+
+    fn or(vals: Vec<Value>) -> Result<Value, EvalError> {
+        let mut res = false;
+        for v in vals {
+            res = res || v.as_bool()?;
+            if res {
+                break;
+            }
+        }
+        Ok(Value::Bool(res))
+    }
+
     fn make_builtin(name: &str, body: impl BuiltinBodyFn) -> (String, Rc<Builtin>) {
         (name.to_string(), Rc::new(Builtin::new(name, FunctionBody::new(body))))
     }
@@ -299,6 +322,8 @@ pub mod default_builtins {
             make_builtin("gt", gt),
             make_builtin("<", lt),
             make_builtin("lt", lt),
+            make_builtin("and", and),
+            make_builtin("or", or),
             make_builtin("print", print),
             make_builtin("assert", assert),
             make_builtin("string", string),

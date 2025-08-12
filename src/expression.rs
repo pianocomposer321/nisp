@@ -606,4 +606,40 @@ mod test {
 
         Ok(())
     }
+
+    #[test]
+    fn eval_and() -> ExprTestResult<()> {
+        let scope = scope();
+        let mut values = eval(scope.clone(), "(and true true true)")?.into_iter();
+        assert_next_value_eq!(values, Value::Bool(true));
+
+        let mut values = eval(scope.clone(), "(and true false true)")?.into_iter();
+        assert_next_value_eq!(values, Value::Bool(false));
+
+        let mut values = eval(scope.clone(), "(and false true true)")?.into_iter();
+        assert_next_value_eq!(values, Value::Bool(false));
+
+        let mut values = eval(scope.clone(), "(and false false false)")?.into_iter();
+        assert_next_value_eq!(values, Value::Bool(false));
+
+        Ok(())
+    }
+
+    #[test]
+    fn eval_or() -> ExprTestResult<()> {
+        let scope = scope();
+        let mut values = eval(scope.clone(), "(or true true true)")?.into_iter();
+        assert_next_value_eq!(values, Value::Bool(true));
+
+        let mut values = eval(scope.clone(), "(or true false true)")?.into_iter();
+        assert_next_value_eq!(values, Value::Bool(true));
+
+        let mut values = eval(scope.clone(), "(or false true true)")?.into_iter();
+        assert_next_value_eq!(values, Value::Bool(true));
+
+        let mut values = eval(scope.clone(), "(or false false false)")?.into_iter();
+        assert_next_value_eq!(values, Value::Bool(false));
+
+        Ok(())
+    }
 }
