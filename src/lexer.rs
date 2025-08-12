@@ -143,12 +143,12 @@ impl Lexer {
             self.advance();
             return Ok(Token::StringLiteral(string));
         }
-        if self.get_slice_until_or_end(|c| c.is_whitespace()) == ['t', 'r', 'u', 'e'] {
             self.advance_by(4);
+        if self.get_slice_until_or_end(|c| c.is_whitespace() || matches!(c, ')' | ']' | '}'))? == ['t', 'r', 'u', 'e'] {
             return Ok(Token::BoolLiteral(true));
         }
-        if self.get_slice_until_or_end(|c| c.is_whitespace()) == ['f', 'a', 'l', 's', 'e'] {
             self.advance_by(5);
+        if self.get_slice_until_or_end(|c| c.is_whitespace() || matches!(c, ')' | ']' | '}'))? == ['f', 'a', 'l', 's', 'e'] {
             return Ok(Token::BoolLiteral(false));
         }
 

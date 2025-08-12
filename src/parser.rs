@@ -345,6 +345,13 @@ mod test {
         let mut p = parse("(if true 1 2)");
         assert_next_expr_eq!(p, Expr::Call("if".to_string(), vec![Expr::Bool(true), Expr::Int(1), Expr::Int(2)]));
 
+
+        let mut p = parse("(if false 1 2)");
+        assert_next_expr_eq!(p, Expr::Call("if".to_string(), vec![Expr::Bool(false), Expr::Int(1), Expr::Int(2)]));
+
+        let mut p = parse("(assert false)");
+        assert_next_expr_eq!(p, Expr::Call("assert".to_string(), vec![Expr::Bool(false)]));
+
         Ok(())
     }
 }
