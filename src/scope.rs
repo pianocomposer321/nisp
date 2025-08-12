@@ -108,22 +108,77 @@ impl Scope {
     }
 
     // TODO: this will be more complicated later
-    pub fn pattern_match_assign(&mut self, left: &[Expr], right: Vec<Expr>) -> Result<(), EvalError> {
-        if left.len() != right.len() {
-            return Err(EvalError::PatternMatchLengthMismatch {
-                expected: left.len(),
-                got: right.len(),
-            });
-        } else {
-            for (l, r) in left.into_iter().zip(right.into_iter()) {
-                match (l, r) {
-                    (Expr::Symbol(l), r) => {
-                        self.set_value(&l, r.eval(self.clone())?);
+    pub fn pattern_match_assign(&mut self, left: Expr, right: Value) -> Result<(), EvalError> {
+        match (left.clone(), right.clone()) {
+            (Expr::Int(l), r) => {
+                if let Value::Int(r) = r && l == r {
+                    Ok(())
+                } else {
+                    Err(EvalError::PatternMatchDoesNotMatch {
+                        left,
+                        right,
+                    })
+                }
+            },
+            (Expr::Symbol(l), r) => {
+                self.set_value(&l, r);
+                Ok(())
+            },
+            (Expr::Bool(l), r) => {
+                if let Value::Bool(r) = r && l == r {
+                    Ok(())
+                } else {
+                    Err(EvalError::PatternMatchDoesNotMatch {
+                        left,
+                        right,
+                    })
+                }
+            },
+            (Expr::Unit, r) => {
+                if let Value::Unit = r {
+                    Ok(())
+                } else {
+                    Err(EvalError::PatternMatchDoesNotMatch {
+                        left,
+                        right,
+                    })
+                }
+            },
+            (Expr::String(l), r) => {
+                if let Value::String(r) = r && l == *r {
+                    Ok(())
+                } else {
+                    Err(EvalError::PatternMatchDoesNotMatch {
+                        left,
+                        right,
+                    })
+                }
+            },
+            (Expr::List(l), r) => {
+                if let Value::List(r) = r {
+                    if l.len() != r.len() {
+                        return Err(EvalError::PatternMatchDoesNotMatch {
+                            left,
+                            right,
+                        });
                     }
-                    _ => todo!(),
+                    for (left, right) in l.iter().zip(r.iter()) {
+                        // dbg!(&left, &right);
+                        self.pattern_match_assign(left.clone(), right.clone())?;
+                    }
+                    // dbg!("matches!");
+                    Ok(())
+                } else {
+                    Err(EvalError::PatternMatchDoesNotMatch {
+                        left,
+                        right,
+                    })
                 }
             }
-            Ok(())
+            (left, _) => Err(EvalError::TypeError {
+                expected: "Symbol, Int, String, Bool, Unit, or List".to_string(),
+                got: left.type_name(),
+            }),
         }
     }
 }

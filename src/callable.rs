@@ -1,6 +1,5 @@
 use std::{
-    fmt,
-    sync::atomic::{AtomicUsize, Ordering},
+    fmt, rc::Rc, sync::atomic::{AtomicUsize, Ordering}
 };
 
 use crate::{
@@ -66,7 +65,7 @@ impl Builtin {
 static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
 
 pub struct FunctionDefn {
-    args: Vec<Expr>,
+    args: Expr,
     body: Vec<Expr>,
     id: usize,
 }
@@ -78,7 +77,7 @@ impl ToString for FunctionDefn {
 }
 
 impl FunctionDefn {
-    pub fn new(args: Vec<Expr>, body: Vec<Expr>) -> Self {
+    pub fn new(args: Expr, body: Vec<Expr>) -> Self {
         Self {
             args,
             body,
@@ -86,8 +85,8 @@ impl FunctionDefn {
         }
     }
 
-    pub fn args(&self) -> &[Expr] {
-        &self.args
+    pub fn args(&self) -> Expr {
+        self.args.clone()
     }
 
     pub fn call(&self, scope: Scope) -> Result<Value, EvalError> {
@@ -347,8 +346,7 @@ pub mod default_intrinsics {
             .ok_or(EvalError::NotEnoughArgs {
                 expected: 3,
                 got: 1,
-            })?
-            .as_list()?;
+            })?;
         let body: Vec<Expr> = iter
             .next()
             .ok_or(EvalError::NotEnoughArgs {
@@ -392,6 +390,47 @@ pub mod default_intrinsics {
         }
     }
 
+    fn match_(mut scope: Scope, exprs: Vec<Expr>) -> Result<Value, EvalError> {
+
+        let mut iter = exprs.into_iter();
+        let value = iter
+            .next()
+            .ok_or(EvalError::NotEnoughArgs {
+                expected: 2,
+                got: 0,
+            })?
+            .eval(scope.clone())?;
+        let body = iter
+            .next()
+            .ok_or(EvalError::NotEnoughArgs {
+                expected: 2,
+                got: 1,
+            })?
+            .as_list()?;
+
+        for window in body.chunks(2) {
+            let (pattern, body) = (window[0].clone(), window[1].clone());
+
+            // dbg!(&pattern, &value);
+            match scope.pattern_match_assign(pattern, value.clone()) {
+                Ok(_) => {
+                    let child_scope = Scope::child(scope.clone());
+                    let value = eval_block(child_scope.clone(), body.as_block()?)?;
+                    dbg!(&value);
+                    return Ok(value);
+                },
+                Err(EvalError::PatternMatchDoesNotMatch { left: _, right: _ }) => {
+                    continue;
+                },
+                Err(e) => {
+                    return Err(e);
+                }
+            }
+        }
+
+        Err(EvalError::NoMatchingPattern { right: value })
+    }
+
     fn make_intrinsic(name: &str, body: impl IntrinsicBodyFn) -> (String, Rc<Intrinsic>) {
         (name.to_string(), Rc::new(Intrinsic::new(name, IntrinsicBody::new(body))))
     }
@@ -401,6 +440,7 @@ pub mod default_intrinsics {
             make_intrinsic("set", set),
             make_intrinsic("defn", defn),
             make_intrinsic("if", if_),
+            make_intrinsic("match", match_),
         ])
     }
 }

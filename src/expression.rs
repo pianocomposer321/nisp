@@ -13,18 +13,30 @@ pub fn eval_block(scope: Scope, exprs: Vec<Expr>) -> Result<Value, EvalError> {
 pub enum EvalError {
     #[error("Type error: expected {expected:?} but got {got:?}")]
     TypeError { expected: String, got: String },
+
     #[error("Not enough arguments: expected {expected:?} but got {got:?}")]
     NotEnoughArgs { expected: usize, got: usize },
+
     #[error(transparent)]
     ScopeError(#[from] ScopeError),
+
     #[error("Pattern match length mismatch: expected {expected:?} but got {got:?}")]
     PatternMatchLengthMismatch { expected: usize, got: usize },
+
+    #[error("Pattern match does not match: left {left:?} right {right:?}")]
+    PatternMatchDoesNotMatch { left: Expr, right: Value },
+
+    #[error("No matching pattern: {right:?}")]
+    NoMatchingPattern { right: Value },
+
     #[error("Undefined variable: {name}")]
     UndefinedVariable { name: String },
+
     #[error("Assertion failed")]
     AssertionFailed,
 }
 
+// TODO: Values inside should be inside Rc
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Expr {
     Call(String, Vec<Expr>),
@@ -53,7 +65,9 @@ impl Expr {
                 }
 
                 let function = scope.get_value(&name)?.as_function_defn()?;
-                child_scope.pattern_match_assign(function.args(), args)?;
+                for expr in args.into_iter() {
+                    child_scope.pattern_match_assign(function.args(), expr.eval(child_scope.clone())?)?;
+                }
                 function.call(child_scope.clone())
             }
             Expr::Symbol(name) => {
@@ -135,11 +149,7 @@ impl Expr {
     pub fn as_block(self) -> Result<Vec<Expr>, EvalError> {
         match self {
             Expr::Block(b) => Ok(b),
-            Expr::Call(_, _) => Ok(vec![self]),
-            _ => Err(EvalError::TypeError {
-                expected: "Block".to_string(),
-                got: self.type_name(),
-            }),
+            _ => Ok(vec![self]),
         }
     }
 }
@@ -422,14 +432,14 @@ mod test {
     #[test]
     fn eval_sub() -> ExprTestResult<()> {
         let scope = scope();
+        let mut values = eval(scope.clone(), "(- 2 1)")?.into_iter();
+        assert_next_value_eq!(values, Value::Int(1));
+
         let mut values = eval(scope.clone(), "(- 1 2)")?.into_iter();
         assert_next_value_eq!(values, Value::Int(-1));
 
         let mut values = eval(scope.clone(), "(- 1 2 3)")?.into_iter();
         assert_next_value_eq!(values, Value::Int(-4));
-
-        let mut values = eval(scope.clone(), "(- 2 1)")?.into_iter();
-        assert_next_value_eq!(values, Value::Int(1));
 
         Ok(())
     }
@@ -537,4 +547,43 @@ mod test {
 
         Ok(())
     }
+
+    #[test]
+    fn eval_match() -> ExprTestResult<()> {
+        let scope = scope();
+        let mut values = eval(scope.clone(), "(match 1 [ 1 \"one\" 2 \"two\" 3 \"three\" ])")?.into_iter();
+        assert_next_value_eq!(values, Value::String(Rc::new("one".to_string())));
+
+        let mut values = eval(scope.clone(), "(match \"hello\" [ \"world\" 1 \"hello\" 2 ])")?.into_iter();
+        assert_next_value_eq!(values, Value::Int(2));
+
+        Ok(())
+    }
+
+    #[test]
+    fn eval_match_with_block() -> ExprTestResult<()> {
+        let scope = scope();
+        let mut values = eval(scope.clone(), "(match 2 [ 1 { (set x \"one\") x } 2 { (set x \"two\") x } 3 { (set x \"three\") x } ])")?.into_iter();
+        assert_next_value_eq!(values, Value::String(Rc::new("two".to_string())));
+
+        Ok(())
+    }
+
+    #[test]
+    fn eval_match_pattern() -> ExprTestResult<()> {
+        let scope = scope();
+        let mut values = eval(scope.clone(), "(match [1 2 3] [ [x y] (+ x y) [x y 1] (+ x y) [1 x y] (+ x y) ])")?.into_iter();
+        assert_next_value_eq!(values, Value::Int(5));
+
+        Ok(())
+    }
+
+    // #[test]
+    // fn eval_match_with_list_rest() -> ExprTestResult<()> {
+    //     let scope = scope();
+    //     let mut values = eval(scope.clone(), "(match [1 2 3] [ [x] (+ x 1) [x &rest] [x rest]])")?.into_iter();
+    //     assert_next_value_eq!(values, Value::List(Rc::new(vec![Value::Int(1), Value::List(Rc::new(vec![Value::Int(2), Value::Int(3)]))])));
+    //
+    //     Ok(())
+    // }
 }
