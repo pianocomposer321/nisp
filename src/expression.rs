@@ -66,9 +66,9 @@ impl Expr {
         }
     }
 
-    pub fn as_int(&self) -> Result<i64, EvalError> {
+    pub fn as_int(self) -> Result<i64, EvalError> {
         match self {
-            Expr::Int(i) => Ok(*i),
+            Expr::Int(i) => Ok(i),
             _ => Err(EvalError::TypeError {
                 expected: "Int".to_string(),
                 got: self.type_name(),
@@ -76,9 +76,9 @@ impl Expr {
         }
     }
 
-    pub fn as_string(&self) -> Result<String, EvalError> {
+    pub fn as_string(self) -> Result<String, EvalError> {
         match self {
-            Expr::String(s) => Ok(s.clone()),
+            Expr::String(s) => Ok(s),
             _ => Err(EvalError::TypeError {
                 expected: "String".to_string(),
                 got: self.type_name(),
@@ -86,9 +86,9 @@ impl Expr {
         }
     }
 
-    pub fn as_symbol(&self) -> Result<String, EvalError> {
+    pub fn as_symbol(self) -> Result<String, EvalError> {
         match self {
-            Expr::Symbol(s) => Ok(s.clone()),
+            Expr::Symbol(s) => Ok(s),
             _ => Err(EvalError::TypeError {
                 expected: "Symbol".to_string(),
                 got: self.type_name(),
