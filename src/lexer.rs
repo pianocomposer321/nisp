@@ -45,6 +45,8 @@ pub enum Token {
     StringLiteral(String),
     /// true, false
     BoolLiteral(bool),
+    /// &rest
+    RestOp,
 }
 
 pub struct TokenIter<'a>(&'a mut Lexer);
@@ -133,6 +135,10 @@ impl Lexer {
         if ch == '}' {
             self.advance()?;
             return Ok(Token::CloseBrace);
+        }
+        if ch == '&' {
+            self.advance()?;
+            return Ok(Token::RestOp);
         }
         if ch == '-' {
             self.advance()?;
@@ -555,6 +561,28 @@ mod test {
     fn lex_sub() -> LexingResult<()> {
         let mut l = lex("-");
         assert_next_token_eq!(&mut l, Token::Symbol("-".to_string()));
+        assert_eof!(&mut l);
+
+        Ok(())
+    }
+
+    #[test]
+    fn lex_rest_operator() -> LexingResult<()> {
+        let mut l = lex("&rest");
+        assert_next_token_eq!(&mut l, Token::RestOp);
+        assert_next_token_eq!(&mut l, Token::Symbol("rest".to_string()));
+        assert_eof!(&mut l);
+
+        Ok(())
+    }
+
+    #[test]
+    fn lex_rest_operator_in_list() -> LexingResult<()> {
+        let mut l = lex("[&rest]");
+        assert_next_token_eq!(&mut l, Token::OpenBracket);
+        assert_next_token_eq!(&mut l, Token::RestOp);
+        assert_next_token_eq!(&mut l, Token::Symbol("rest".to_string()));
+        assert_next_token_eq!(&mut l, Token::CloseBracket);
         assert_eof!(&mut l);
 
         Ok(())

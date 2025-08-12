@@ -46,6 +46,7 @@ pub enum Expr {
     Bool(bool),
     String(String),
     Symbol(String),
+    RestOp(String),
     Unit,
 }
 
@@ -102,6 +103,7 @@ impl Expr {
             Expr::Block(_) => "Block".to_string(),
             Expr::Symbol(_) => "Symbol".to_string(),
             Expr::Bool(_) => "Bool".to_string(),
+            Expr::RestOp(_) => "RestOp".to_string(),
             Expr::Unit => "Unit".to_string(),
         }
     }

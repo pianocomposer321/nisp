@@ -124,6 +124,16 @@ impl Parser {
                 self.advance();
                 Ok(Expr::Bool(b))
             }
+            Token::RestOp => {
+                self.advance();
+                let next_token = self.get_token()?;
+                if let Token::Symbol(s) = next_token {
+                    self.advance();
+                    Ok(Expr::RestOp(s))
+                } else {
+                    Err(ParsingError::UnexpectedToken(next_token))
+                }
+            }
             _ => {
                 self.advance();
                 Err(ParsingError::UnexpectedToken(token))
@@ -351,6 +361,14 @@ mod test {
 
         let mut p = parse("(assert false)");
         assert_next_expr_eq!(p, Expr::Call("assert".to_string(), vec![Expr::Bool(false)]));
+
+        Ok(())
+    }
+
+    #[test]
+    fn parse_rest_operator() -> ParsingResult<()> {
+        let mut p = parse("&rest");
+        assert_next_expr_eq!(p, Expr::RestOp("rest".to_string()));
 
         Ok(())
     }
