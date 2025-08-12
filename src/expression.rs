@@ -2,7 +2,7 @@ use std::{cell::RefMut, rc::Rc};
 
 use thiserror::Error;
 
-use crate::{callable::FunctionDefn, scope::{Scope, ScopeError}};
+use crate::{callable::Function, scope::{Scope, ScopeError}};
 
 #[derive(Error, Debug)]
 pub enum EvalError {
@@ -101,8 +101,19 @@ impl Expr {
 pub enum Value {
     Int(i64),
     String(Rc<String>),
-    FunctionDefn(Rc<FunctionDefn>),
+    FunctionDefn(Rc<Function>),
     Unit,
+}
+
+impl ToString for Value {
+    fn to_string(&self) -> String {
+        match self {
+            Value::Int(i) => i.to_string(),
+            Value::String(s) => s.to_string(),
+            Value::FunctionDefn(d) => d.to_string(),
+            Value::Unit => "()".to_string(),
+        }
+    }
 }
 
 impl Value {
@@ -122,9 +133,9 @@ impl Value {
 
     pub fn as_string(&self) -> Result<String, EvalError> {
         match self {
-            Value::String(s) => Ok(Rc::into_inner(s.clone()).unwrap()),
+            Value::String(s) => Ok(s.to_string()),
             _ => Err(EvalError::TypeError {
-                expected: "String".to_string(),
+                expected: "String | Int | Unit".to_string(),
                 got: self.type_name(),
             }),
         }
@@ -224,6 +235,18 @@ mod test {
         let mut values = eval(scope, "(set x 10) x")?.into_iter();
         assert_next_value_eq!(values, Value::Unit);
         assert_next_value_eq!(values, Value::Int(10));
+
+        Ok(())
+    }
+
+    #[test]
+    fn eval_print() -> Result<(), ()> {
+        let scope = scope();
+        let mut values = eval(scope.clone(), "(print \"hello\")").unwrap().into_iter();
+        assert_next_value_eq!(values, Value::Unit);
+
+        let mut values = eval(scope.clone(), "(print \"hello\" \"world\")").unwrap().into_iter();
+        assert_next_value_eq!(values, Value::Unit);
 
         Ok(())
     }

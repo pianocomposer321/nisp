@@ -66,13 +66,19 @@ impl Builtin {
 static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
 
 #[derive(Debug)]
-pub struct FunctionDefn {
+pub struct Function {
     args: Expr,
     body: FunctionBody,
     id: usize,
 }
 
-impl FunctionDefn {
+impl ToString for Function {
+    fn to_string(&self) -> String {
+        format!("<Function {}>", self.id)
+    }
+}
+
+impl Function {
     pub fn new(args: Expr, body: FunctionBody) -> Self {
         Self {
             args,
@@ -86,7 +92,7 @@ impl FunctionDefn {
     }
 }
 
-impl PartialEq for FunctionDefn {
+impl PartialEq for Function {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id
     }
@@ -122,6 +128,25 @@ pub mod default_builtins {
         Ok(Value::Int(sum))
     }
 
+    fn print(_: Scope, vals: Vec<Value>) -> Result<Value, EvalError> {
+        let mut iter = vals.into_iter();
+        let value = iter
+            .next()
+            .ok_or(EvalError::NotEnoughArgs {
+                expected: 1,
+                got: 0,
+            })?
+            .as_string()?;
+        print!("{}", value);
+
+        for value in iter {
+            print!(" {}", value.as_string()?);
+        }
+        println!();
+
+        Ok(Value::Unit)
+    }
+
     fn make_builtin(name: &str, body: impl FunctionBodyFn) -> (String, Rc<Builtin>) {
         (name.to_string(), Rc::new(Builtin::new(name, FunctionBody::new(body))))
     }
@@ -129,6 +154,7 @@ pub mod default_builtins {
     pub fn builtins() -> HashMap<String, Rc<Builtin>> {
         HashMap::from([
             make_builtin("+", add),
+            make_builtin("print", print),
         ])
     }
 }
