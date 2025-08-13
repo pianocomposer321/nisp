@@ -1,7 +1,7 @@
-# Spread operator
+# Spread operator (Implemented)
 
 ```lisp
-(def print [*args] {
+(def print [&args] {
   ...
 })
 
@@ -22,7 +22,7 @@
 (print map.last-name) ; prints "Doe"
 ```
 
-# Pattern matching
+# Pattern matching (Partially implemented)
 
 ```lisp
 (set [hello world] ["hello" "world"])
