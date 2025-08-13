@@ -54,11 +54,11 @@ impl Parser {
             }
             Token::StringLiteral(s) => {
                 self.advance();
-                Ok(Expr::String(s))
+                Ok(Expr::String(Rc::new(s)))
             }
             Token::Symbol(s) => {
                 self.advance();
-                Ok(Expr::Symbol(s))
+                Ok(Expr::Symbol(Rc::new(s)))
             }
             Token::OpenParen => {
                 self.advance();
@@ -71,7 +71,7 @@ impl Parser {
                     let next_token = self.get_token()?;
                     if next_token == Token::CloseParen {
                         self.advance();
-                        Ok(Expr::Call(s, vec![]))
+                        Ok(Expr::Call(Rc::new(s), vec![]))
                     } else {
                         let mut exprs = Vec::new();
                         let mut parser = Parser::from(self);
@@ -80,7 +80,7 @@ impl Parser {
                             exprs.push(expr);
                         }
                         self.position = parser.position;
-                        Ok(Expr::Call(s, exprs))
+                        Ok(Expr::Call(Rc::new(s), exprs))
                     }
                 } else {
                     Err(ParsingError::UnexpectedToken(next_token))
@@ -129,7 +129,7 @@ impl Parser {
                 let next_token = self.get_token()?;
                 if let Token::Symbol(s) = next_token {
                     self.advance();
-                    Ok(Expr::SpreadOp(s))
+                    Ok(Expr::SpreadOp(Rc::new(s)))
                 } else {
                     Err(ParsingError::UnexpectedToken(next_token))
                 }
@@ -183,7 +183,7 @@ mod test {
     #[test]
     fn parse_string() -> ParsingResult<()> {
         let mut p = parse("\"Hello, world!\"");
-        assert_next_expr_eq!(p, Expr::String("Hello, world!".to_string()));
+        assert_next_expr_eq!(p, Expr::String(Rc::new("Hello, world!".to_string())));
 
         Ok(())
     }
@@ -191,7 +191,7 @@ mod test {
     #[test]
     fn parse_symbol() -> ParsingResult<()> {
         let mut p = parse("foo");
-        assert_next_expr_eq!(p, Expr::Symbol("foo".to_string()));
+        assert_next_expr_eq!(p, Expr::Symbol(Rc::new("foo".to_string())));
 
         Ok(())
     }
@@ -237,7 +237,7 @@ mod test {
     #[test]
     fn parse_empty_call() -> ParsingResult<()> {
         let mut p = parse("(foo)");
-        assert_next_expr_eq!(p, Expr::Call("foo".to_string(), vec![]));
+        assert_next_expr_eq!(p, Expr::Call(Rc::new("foo".to_string()), vec![]));
 
         Ok(())
     }
@@ -245,7 +245,7 @@ mod test {
     #[test]
     fn parse_call() -> ParsingResult<()> {
         let mut p = parse("(foo 123)");
-        assert_next_expr_eq!(p, Expr::Call("foo".to_string(), vec![Expr::Int(123)]));
+        assert_next_expr_eq!(p, Expr::Call(Rc::new("foo".to_string()), vec![Expr::Int(123)]));
 
         Ok(())
     }
@@ -274,18 +274,18 @@ mod test {
         let mut p = parse("(foo [bar (baz 123 \"hello\") qux] quux)");
         assert_next_expr_eq!(
             p,
-            Expr::Call(
-                "foo".to_string(),
+            Expr::new_call(
+                "foo",
                 vec![
                     Expr::List(vec![
-                        Expr::Symbol("bar".to_string()),
-                        Expr::Call(
-                            "baz".to_string(),
-                            vec![Expr::Int(123), Expr::String("hello".to_string())]
+                        Expr::new_symbol("bar"),
+                        Expr::new_call(
+                            "baz",
+                            vec![Expr::Int(123), Expr::new_string("hello")]
                         ),
-                        Expr::Symbol("qux".to_string()),
+                        Expr::new_symbol("qux"),
                     ]),
-                    Expr::Symbol("quux".to_string()),
+                    Expr::new_symbol("quux"),
                 ]
             )
         );
@@ -302,14 +302,14 @@ mod test {
         );
         assert_next_expr_eq!(
             p,
-            Expr::Call(
-                "print".to_string(),
-                vec![Expr::String("hello, world".to_string())]
+            Expr::new_call(
+                "print",
+                vec![Expr::new_string("hello, world")]
             )
         );
         assert_next_expr_eq!(
             p,
-            Expr::Call("+".to_string(), vec![Expr::Int(123), Expr::Int(456)])
+            Expr::new_call("+", vec![Expr::Int(123), Expr::Int(456)])
         );
 
         Ok(())
@@ -320,17 +320,17 @@ mod test {
         let mut p = parse("(defn foo [x y] (+ x y))");
         assert_next_expr_eq!(
             p,
-            Expr::Call(
-                "defn".to_string(),
+            Expr::new_call(
+                "defn",
                 vec![
-                    Expr::Symbol("foo".to_string()),
-                    Expr::List(vec![
-                        Expr::Symbol("x".to_string()),
-                        Expr::Symbol("y".to_string())
+                    Expr::new_symbol("foo"),
+                    Expr::new_list(vec![
+                        Expr::new_symbol("x"),
+                        Expr::new_symbol("y")
                     ]),
-                    Expr::Call(
-                        "+".to_string(),
-                        vec![Expr::Symbol("x".to_string()), Expr::Symbol("y".to_string())]
+                    Expr::new_call(
+                        "+",
+                        vec![Expr::new_symbol("x"), Expr::new_symbol("y")]
                     ),
                 ]
             )
@@ -353,14 +353,14 @@ mod test {
     #[test]
     fn parse_if() -> ParsingResult<()> {
         let mut p = parse("(if true 1 2)");
-        assert_next_expr_eq!(p, Expr::Call("if".to_string(), vec![Expr::Bool(true), Expr::Int(1), Expr::Int(2)]));
+        assert_next_expr_eq!(p, Expr::new_call("if", vec![Expr::Bool(true), Expr::Int(1), Expr::Int(2)]));
 
 
         let mut p = parse("(if false 1 2)");
-        assert_next_expr_eq!(p, Expr::Call("if".to_string(), vec![Expr::Bool(false), Expr::Int(1), Expr::Int(2)]));
+        assert_next_expr_eq!(p, Expr::new_call("if", vec![Expr::Bool(false), Expr::Int(1), Expr::Int(2)]));
 
         let mut p = parse("(assert false)");
-        assert_next_expr_eq!(p, Expr::Call("assert".to_string(), vec![Expr::Bool(false)]));
+        assert_next_expr_eq!(p, Expr::new_call("assert", vec![Expr::Bool(false)]));
 
         Ok(())
     }
@@ -368,7 +368,7 @@ mod test {
     #[test]
     fn parse_spread_operator() -> ParsingResult<()> {
         let mut p = parse("&rest");
-        assert_next_expr_eq!(p, Expr::SpreadOp("rest".to_string()));
+        assert_next_expr_eq!(p, Expr::new_spread_op("rest"));
 
         Ok(())
     }

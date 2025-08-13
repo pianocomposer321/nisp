@@ -145,7 +145,7 @@ impl Scope {
                 }
             },
             (Expr::String(l), r) => {
-                if let Value::String(r) = r && l == *r {
+                if let Value::String(r) = r && l == r {
                     Ok(())
                 } else {
                     Err(EvalError::PatternMatchDoesNotMatch {

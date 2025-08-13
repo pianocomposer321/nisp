@@ -39,14 +39,14 @@ pub enum EvalError {
 // TODO: Values inside should be inside Rc
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Expr {
-    Call(String, Vec<Expr>),
+    Call(Rc<String>, Vec<Expr>),
     List(Vec<Expr>),
     Block(Vec<Expr>),
     Int(i64),
     Bool(bool),
-    String(String),
-    Symbol(String),
-    SpreadOp(String),
+    String(Rc<String>),
+    Symbol(Rc<String>),
+    SpreadOp(Rc<String>),
     Unit,
 }
 
@@ -54,7 +54,7 @@ impl Expr {
     pub fn eval(self, scope: Scope) -> Result<Value, EvalError> {
         match self {
             Expr::Int(i) => Ok(Value::Int(i)),
-            Expr::String(s) => Ok(Value::String(Rc::new(s))),
+            Expr::String(s) => Ok(Value::String(s)),
             Expr::Call(name, args) => {
                 let mut child_scope = Scope::child(scope.clone());
                 if let Some(builtin) = scope.get_builtin(&name) {
@@ -66,7 +66,7 @@ impl Expr {
                 }
 
                 let function = scope.get_value(&name)?.as_function_defn()?;
-                child_scope.pattern_match_assign(Expr::List(function.args()?), Value::List(Rc::new(Expr::values(scope.clone(), args)?)))?;
+                child_scope.pattern_match_assign(Expr::List(function.args()?), Value::new_list(Expr::values(scope.clone(), args)?))?;
                 function.call(child_scope.clone())
             }
             Expr::Symbol(name) => {
@@ -79,10 +79,46 @@ impl Expr {
             Expr::Block(b) => eval_block(Scope::child(scope), b),
             Expr::List(l) => {
                 let values = Expr::values(scope.clone(), l)?;
-                Ok(Value::List(Rc::new(values)))
+                Ok(Value::new_list(values))
             },
             _ => todo!(),
         }
+    }
+
+    pub fn new_call(name: &str, args: Vec<Expr>) -> Self {
+        Self::Call(Rc::new(name.to_string()), args)
+    }
+
+    pub fn new_list(args: Vec<Expr>) -> Self {
+        Self::List(args)
+    }
+
+    pub fn new_block(args: Vec<Expr>) -> Self {
+        Self::Block(args)
+    }
+
+    pub fn new_int(i: i64) -> Self {
+        Self::Int(i)
+    }
+
+    pub fn new_bool(b: bool) -> Self {
+        Self::Bool(b)
+    }
+
+    pub fn new_string(s: &str) -> Self {
+        Self::String(Rc::new(s.to_string()))
+    }
+
+    pub fn new_symbol(s: &str) -> Self {
+        Self::Symbol(Rc::new(s.to_string()))
+    }
+
+    pub fn new_spread_op(s: &str) -> Self {
+        Self::SpreadOp(Rc::new(s.to_string()))
+    }
+    
+    pub fn new_unit() -> Self {
+        Self::Unit
     }
 
     pub fn values(scope: Scope, exprs: Vec<Expr>) -> Result<Vec<Value>, EvalError> {
@@ -118,7 +154,7 @@ impl Expr {
 
     pub fn as_string(self) -> Result<String, EvalError> {
         match self {
-            Expr::String(s) => Ok(s),
+            Expr::String(s) => Ok(nisp::unwrap_rc(s, |rc| rc.to_string())),
             _ => Err(EvalError::TypeError {
                 expected: "String".to_string(),
                 got: self.type_name(),
@@ -128,7 +164,7 @@ impl Expr {
 
     pub fn as_symbol(self) -> Result<String, EvalError> {
         match self {
-            Expr::Symbol(s) => Ok(s),
+            Expr::Symbol(s) => Ok(nisp::unwrap_rc(s, |rc| rc.to_string())),
             _ => Err(EvalError::TypeError {
                 expected: "Symbol".to_string(),
                 got: self.type_name(),
@@ -155,7 +191,7 @@ impl Expr {
 
     pub fn as_rest_op(self) -> Result<String, EvalError> {
         match self {
-            Expr::SpreadOp(s) => Ok(s),
+            Expr::SpreadOp(s) => Ok(nisp::unwrap_rc(s, |rc| rc.to_string())),
             _ => Err(EvalError::TypeError {
                 expected: "RestOp".to_string(),
                 got: self.type_name(),
@@ -202,8 +238,28 @@ impl ToString for Value {
 }
 
 impl Value {
+    pub fn new_int(i: i64) -> Self {
+        Value::Int(i)
+    }
+
     pub fn new_string(s: &str) -> Self {
         Value::String(Rc::new(s.to_string()))
+    }
+
+    pub fn new_function_defn(f: FunctionDefn) -> Self {
+        Value::FunctionDefn(Rc::new(f))
+    }
+
+    pub fn new_bool(b: bool) -> Self {
+        Value::Bool(b)
+    }
+
+    pub fn new_list(l: Vec<Value>) -> Self {
+        Value::List(Rc::new(l))
+    }
+
+    pub fn new_unit() -> Self {
+        Value::Unit
     }
 
     pub fn as_int(self) -> Result<i64, EvalError> {
@@ -316,7 +372,7 @@ mod test {
     fn eval_int() -> ExprTestResult<()> {
         let scope = scope();
         let mut values = eval(scope, "42")?.into_iter();
-        assert_next_value_eq!(values, Value::Int(42));
+        assert_next_value_eq!(values, Value::new_int(42));
 
         Ok(())
     }
@@ -334,7 +390,7 @@ mod test {
     fn eval_call() -> ExprTestResult<()> {
         let scope = scope();
         let mut values = eval(scope, "(+ 1 2)")?.into_iter();
-        assert_next_value_eq!(values, Value::Int(3));
+        assert_next_value_eq!(values, Value::new_int(3));
 
         Ok(())
     }
@@ -343,7 +399,7 @@ mod test {
     fn eval_multiple_args() -> ExprTestResult<()> {
         let scope = scope();
         let mut values = eval(scope, "(+ 1 2 3)")?.into_iter();
-        assert_next_value_eq!(values, Value::Int(6));
+        assert_next_value_eq!(values, Value::new_int(6));
 
         Ok(())
     }
@@ -352,8 +408,8 @@ mod test {
     fn eval_variable() -> ExprTestResult<()> {
         let scope = scope();
         let mut values = eval(scope, "(set x 10) x")?.into_iter();
-        assert_next_value_eq!(values, Value::Unit);
-        assert_next_value_eq!(values, Value::Int(10));
+        assert_next_value_eq!(values, Value::new_unit());
+        assert_next_value_eq!(values, Value::new_int(10));
 
         Ok(())
     }
@@ -362,10 +418,10 @@ mod test {
     fn eval_print() -> ExprTestResult<()> {
         let scope = scope();
         let mut values = eval(scope.clone(), "(print \"hello\")")?.into_iter();
-        assert_next_value_eq!(values, Value::Unit);
+        assert_next_value_eq!(values, Value::new_unit());
 
         let mut values = eval(scope.clone(), "(print \"hello\" \"world\")")?.into_iter();
-        assert_next_value_eq!(values, Value::Unit);
+        assert_next_value_eq!(values, Value::new_unit());
 
         Ok(())
     }
@@ -374,10 +430,10 @@ mod test {
     fn eval_defn() -> ExprTestResult<()> {
         let scope = scope();
         let mut values = eval(scope.clone(), "(defn f [x] (+ x 1))")?.into_iter();
-        assert_next_value_eq!(values, Value::Unit);
+        assert_next_value_eq!(values, Value::new_unit());
 
         let mut values = eval(scope.clone(), "(f 1)")?.into_iter();
-        assert_next_value_eq!(values, Value::Int(2));
+        assert_next_value_eq!(values, Value::new_int(2));
 
         Ok(())
     }
@@ -386,10 +442,10 @@ mod test {
     fn eval_defn_with_block() -> ExprTestResult<()> {
         let scope = scope();
         let mut values = eval(scope.clone(), "(defn f [x] { (set y (+ x 1)) (set z (+ x 2)) (+ y z) })")?.into_iter();
-        assert_next_value_eq!(values, Value::Unit);
+        assert_next_value_eq!(values, Value::new_unit());
 
         let mut values = eval(scope.clone(), "(f 1)")?.into_iter();
-        assert_next_value_eq!(values, Value::Int(5));
+        assert_next_value_eq!(values, Value::new_int(5));
 
         Ok(())
     }
@@ -398,10 +454,10 @@ mod test {
     fn eval_if() -> ExprTestResult<()> {
         let scope = scope();
         let mut values = eval(scope.clone(), "(if true 1 2)")?.into_iter();
-        assert_next_value_eq!(values, Value::Int(1));
+        assert_next_value_eq!(values, Value::new_int(1));
 
         let mut values = eval(scope.clone(), "(if false 1 2)")?.into_iter();
-        assert_next_value_eq!(values, Value::Int(2));
+        assert_next_value_eq!(values, Value::new_int(2));
 
         Ok(())
     }
@@ -410,10 +466,10 @@ mod test {
     fn eval_eq() -> ExprTestResult<()> {
         let scope = scope();
         let mut values = eval(scope.clone(), "(= 1 1)")?.into_iter();
-        assert_next_value_eq!(values, Value::Bool(true));
+        assert_next_value_eq!(values, Value::new_bool(true));
 
         let mut values = eval(scope.clone(), "(= 1 2)")?.into_iter();
-        assert_next_value_eq!(values, Value::Bool(false));
+        assert_next_value_eq!(values, Value::new_bool(false));
 
         Ok(())
     }
@@ -422,8 +478,8 @@ mod test {
     fn eval_recursive_function() -> ExprTestResult<()> {
         let scope = scope();
         let mut values = eval(scope.clone(), "(defn f [x] (if (= x 10) 10 (f (+ x 1)))) (f 1)")?.into_iter();
-        assert_next_value_eq!(values, Value::Unit);
-        assert_next_value_eq!(values, Value::Int(10));
+        assert_next_value_eq!(values, Value::new_unit());
+        assert_next_value_eq!(values, Value::new_int(10));
 
         Ok(())
     }
@@ -433,7 +489,7 @@ mod test {
         let scope = scope();
         let mut values = eval(scope.clone(), "(set x { 1 2 3 }) x")?.into_iter();
         assert_next_value_eq!(values, Value::Unit);
-        assert_next_value_eq!(values, Value::Int(3));
+        assert_next_value_eq!(values, Value::new_int(3));
 
         Ok(())
     }
@@ -442,7 +498,7 @@ mod test {
     fn eval_assert() -> ExprTestResult<()> {
         let scope = scope();
         let mut values = eval(scope.clone(), "(assert (= 1 1) (= 2 2))")?.into_iter();
-        assert_next_value_eq!(values, Value::Unit);
+        assert_next_value_eq!(values, Value::new_unit());
 
         let values = eval(scope.clone(), "(assert (= 1 2))");
         assert!(matches!(values.unwrap_err(), ExprTestError::EvalError(EvalError::AssertionFailed)));
@@ -453,13 +509,13 @@ mod test {
     fn eval_sub() -> ExprTestResult<()> {
         let scope = scope();
         let mut values = eval(scope.clone(), "(- 2 1)")?.into_iter();
-        assert_next_value_eq!(values, Value::Int(1));
+        assert_next_value_eq!(values, Value::new_int(1));
 
         let mut values = eval(scope.clone(), "(- 1 2)")?.into_iter();
-        assert_next_value_eq!(values, Value::Int(-1));
+        assert_next_value_eq!(values, Value::new_int(-1));
 
         let mut values = eval(scope.clone(), "(- 1 2 3)")?.into_iter();
-        assert_next_value_eq!(values, Value::Int(-4));
+        assert_next_value_eq!(values, Value::new_int(-4));
 
         Ok(())
     }
@@ -468,13 +524,13 @@ mod test {
     fn eval_geq() -> ExprTestResult<()> {
         let scope = scope();
         let mut values = eval(scope.clone(), "(>= 1 1)")?.into_iter();
-        assert_next_value_eq!(values, Value::Bool(true));
+        assert_next_value_eq!(values, Value::new_bool(true));
 
         let mut values = eval(scope.clone(), "(>= 1 2)")?.into_iter();
-        assert_next_value_eq!(values, Value::Bool(false));
+        assert_next_value_eq!(values, Value::new_bool(false));
 
         let mut values = eval(scope.clone(), "(>= 2 1)")?.into_iter();
-        assert_next_value_eq!(values, Value::Bool(true));
+        assert_next_value_eq!(values, Value::new_bool(true));
 
         Ok(())
     }
@@ -483,13 +539,13 @@ mod test {
     fn eval_leq() -> ExprTestResult<()> {
         let scope = scope();
         let mut values = eval(scope.clone(), "(<= 1 1)")?.into_iter();
-        assert_next_value_eq!(values, Value::Bool(true));
+        assert_next_value_eq!(values, Value::new_bool(true));
 
         let mut values = eval(scope.clone(), "(<= 1 2)")?.into_iter();
-        assert_next_value_eq!(values, Value::Bool(true));
+        assert_next_value_eq!(values, Value::new_bool(true));
 
         let mut values = eval(scope.clone(), "(<= 2 1)")?.into_iter();
-        assert_next_value_eq!(values, Value::Bool(false));
+        assert_next_value_eq!(values, Value::new_bool(false));
 
         Ok(())
     }
@@ -498,13 +554,13 @@ mod test {
     fn eval_gt() -> ExprTestResult<()> {
         let scope = scope();
         let mut values = eval(scope.clone(), "(> 1 1)")?.into_iter();
-        assert_next_value_eq!(values, Value::Bool(false));
+        assert_next_value_eq!(values, Value::new_bool(false));
 
         let mut values = eval(scope.clone(), "(> 1 2)")?.into_iter();
-        assert_next_value_eq!(values, Value::Bool(false));
+        assert_next_value_eq!(values, Value::new_bool(false));
 
         let mut values = eval(scope.clone(), "(> 2 1)")?.into_iter();
-        assert_next_value_eq!(values, Value::Bool(true));
+        assert_next_value_eq!(values, Value::new_bool(true));
 
         Ok(())
     }
@@ -513,13 +569,13 @@ mod test {
     fn eval_lt() -> ExprTestResult<()> {
         let scope = scope();
         let mut values = eval(scope.clone(), "(< 1 1)")?.into_iter();
-        assert_next_value_eq!(values, Value::Bool(false));
+        assert_next_value_eq!(values, Value::new_bool(false));
 
         let mut values = eval(scope.clone(), "(< 1 2)")?.into_iter();
-        assert_next_value_eq!(values, Value::Bool(true));
+        assert_next_value_eq!(values, Value::new_bool(true));
 
         let mut values = eval(scope.clone(), "(< 2 1)")?.into_iter();
-        assert_next_value_eq!(values, Value::Bool(false));
+        assert_next_value_eq!(values, Value::new_bool(false));
 
         Ok(())
     }
@@ -543,10 +599,10 @@ mod test {
     fn eval_string_fn() -> ExprTestResult<()> {
         let scope = scope();
         let mut values = eval(scope.clone(), "(string \"hello\")")?.into_iter();
-        assert_next_value_eq!(values, Value::String(Rc::new("hello".to_string())));
+        assert_next_value_eq!(values, Value::new_string("hello"));
 
         let mut values = eval(scope.clone(), "(string 123)")?.into_iter();
-        assert_next_value_eq!(values, Value::String(Rc::new("123".to_string())));
+        assert_next_value_eq!(values, Value::new_string("123"));
 
         Ok(())
     }
@@ -555,14 +611,14 @@ mod test {
     fn eval_list() -> ExprTestResult<()> {
         let scope = scope();
         let mut values = eval(scope.clone(), "[1 2 3]")?.into_iter();
-        assert_next_value_eq!(values, Value::List(Rc::new(vec![Value::Int(1), Value::Int(2), Value::Int(3)])));
+        assert_next_value_eq!(values, Value::new_list(vec![Value::new_int(1), Value::new_int(2), Value::new_int(3)]));
 
         Ok(())
     }
 
     #[test]
     fn list_to_string() -> ExprTestResult<()> {
-        let list = Value::List(Rc::new(vec![Value::Int(1), Value::Int(2), Value::Int(3)]));
+        let list = Value::new_list(vec![Value::new_int(1), Value::new_int(2), Value::new_int(3)]);
         assert_eq!(list.to_string(), "[1, 2, 3]");
 
         Ok(())
@@ -572,10 +628,10 @@ mod test {
     fn eval_match() -> ExprTestResult<()> {
         let scope = scope();
         let mut values = eval(scope.clone(), "(match 1 [ 1 \"one\" 2 \"two\" 3 \"three\" ])")?.into_iter();
-        assert_next_value_eq!(values, Value::String(Rc::new("one".to_string())));
+        assert_next_value_eq!(values, Value::new_string("one"));
 
         let mut values = eval(scope.clone(), "(match \"hello\" [ \"world\" 1 \"hello\" 2 ])")?.into_iter();
-        assert_next_value_eq!(values, Value::Int(2));
+        assert_next_value_eq!(values, Value::new_int(2));
 
         Ok(())
     }
@@ -584,7 +640,7 @@ mod test {
     fn eval_match_with_block() -> ExprTestResult<()> {
         let scope = scope();
         let mut values = eval(scope.clone(), "(match 2 [ 1 { (set x \"one\") x } 2 { (set x \"two\") x } 3 { (set x \"three\") x } ])")?.into_iter();
-        assert_next_value_eq!(values, Value::String(Rc::new("two".to_string())));
+        assert_next_value_eq!(values, Value::new_string("two"));
 
         Ok(())
     }
@@ -593,7 +649,7 @@ mod test {
     fn eval_match_pattern() -> ExprTestResult<()> {
         let scope = scope();
         let mut values = eval(scope.clone(), "(match [1 2 3] [ [x y] (+ x y) [x y 1] (+ x y) [1 x y] (+ x y) ])")?.into_iter();
-        assert_next_value_eq!(values, Value::Int(5));
+        assert_next_value_eq!(values, Value::new_int(5));
 
         Ok(())
     }
@@ -602,7 +658,7 @@ mod test {
     fn eval_match_with_list_spread() -> ExprTestResult<()> {
         let scope = scope();
         let mut values = eval(scope.clone(), "(match [1 2 3] [ [x] (+ x 1) [x &rest] [x rest]])")?.into_iter();
-        assert_next_value_eq!(values, Value::List(Rc::new(vec![Value::Int(1), Value::List(Rc::new(vec![Value::Int(2), Value::Int(3)]))])));
+        assert_next_value_eq!(values, Value::new_list(vec![Value::new_int(1), Value::new_list(vec![Value::new_int(2), Value::new_int(3)])]));
 
         Ok(())
     }
@@ -647,16 +703,16 @@ mod test {
     fn eval_cond() -> ExprTestResult<()> {
         let scope = scope();
         let mut values = eval(scope.clone(), "(cond [(= 1 1) 1])")?.into_iter();
-        assert_next_value_eq!(values, Value::Int(1));
+        assert_next_value_eq!(values, Value::new_int(1));
 
         let mut values = eval(scope.clone(), "(cond [(= 1 2) 1])")?.into_iter();
         assert_next_value_eq!(values, Value::Unit);
 
         let mut values = eval(scope.clone(), "(cond [(= 1 1) 1 (= 1 2) 2])")?.into_iter();
-        assert_next_value_eq!(values, Value::Int(1));
+        assert_next_value_eq!(values, Value::new_int(1));
 
         let mut values = eval(scope.clone(), "(cond [(= 1 2) 1 (= 2 2) 2])")?.into_iter();
-        assert_next_value_eq!(values, Value::Int(2));
+        assert_next_value_eq!(values, Value::new_int(2));
 
         Ok(())
     }
@@ -666,8 +722,8 @@ mod test {
         let scope = scope();
         let mut values = eval(scope.clone(), "(set [a b] [1 2]) a b")?.into_iter();
         assert_next_value_eq!(values, Value::Unit);
-        assert_next_value_eq!(values, Value::Int(1));
-        assert_next_value_eq!(values, Value::Int(2));
+        assert_next_value_eq!(values, Value::new_int(1));
+        assert_next_value_eq!(values, Value::new_int(2));
 
         Ok(())
     }
@@ -677,16 +733,16 @@ mod test {
         let scope = scope();
         let mut values = eval(scope.clone(), "(set-match [a b] [1 2]) a b")?.into_iter();
         assert_next_value_eq!(values, Value::Bool(true));
-        assert_next_value_eq!(values, Value::Int(1));
-        assert_next_value_eq!(values, Value::Int(2));
+        assert_next_value_eq!(values, Value::new_int(1));
+        assert_next_value_eq!(values, Value::new_int(2));
 
         let mut values = eval(scope.clone(), "(set-match [a b c] [1 2])")?.into_iter();
         assert_next_value_eq!(values, Value::Bool(false));
 
         let mut values = eval(scope.clone(), "(set-match [a &rest] [1 2 3]) a rest")?.into_iter();
         assert_next_value_eq!(values, Value::Bool(true));
-        assert_next_value_eq!(values, Value::Int(1));
-        assert_next_value_eq!(values, Value::List(Rc::new(vec![Value::Int(2), Value::Int(3)])));
+        assert_next_value_eq!(values, Value::new_int(1));
+        assert_next_value_eq!(values, Value::new_list(vec![Value::new_int(2), Value::new_int(3)]));
 
         Ok(())
     }
