@@ -660,4 +660,15 @@ mod test {
 
         Ok(())
     }
+
+    #[test]
+    fn set_pattern_match() -> ExprTestResult<()> {
+        let scope = scope();
+        let mut values = eval(scope.clone(), "(set [a b] [1 2]) a b")?.into_iter();
+        assert_next_value_eq!(values, Value::Unit);
+        assert_next_value_eq!(values, Value::Int(1));
+        assert_next_value_eq!(values, Value::Int(2));
+
+        Ok(())
+    }
 }

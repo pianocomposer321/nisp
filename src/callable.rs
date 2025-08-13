@@ -338,21 +338,20 @@ pub mod default_intrinsics {
 
     fn set(mut scope: Scope, exprs: Vec<Expr>) -> Result<Value, EvalError> {
         let mut iter = exprs.into_iter();
-        let variable_name: String = iter
+        let left = iter
             .next()
             .ok_or(EvalError::NotEnoughArgs {
                 expected: 2,
                 got: 0,
-            })?
-            .as_symbol()?;
-        let value = iter
+            })?;
+        let right = iter
             .next()
             .ok_or(EvalError::NotEnoughArgs {
                 expected: 2,
                 got: 1,
             })?
             .eval(scope.clone())?;
-        scope.set_value(&variable_name, value);
+        scope.pattern_match_assign(left, right)?;
 
         Ok(Value::Unit)
     }

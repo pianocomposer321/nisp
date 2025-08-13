@@ -195,11 +195,7 @@ impl Scope {
                     let rest_label = rest_label.unwrap();
                     let rest_len = (r.len() + 1) - l.len();
                     let rest_end = rest_ind + rest_len;
-                    let mut rest_val = Vec::new();
-
-                    for ind in rest_ind..(rest_ind + rest_len) {
-                        rest_val.push(r[ind].clone());
-                    }
+                    let rest_val = r[rest_ind..rest_end].to_vec();
                     self.set_value(&rest_label, Value::List(Rc::new(rest_val)));
 
                     for ind in rest_end..r.len() {
