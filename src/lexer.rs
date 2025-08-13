@@ -142,7 +142,7 @@ impl Lexer {
         }
         if ch == '-' {
             self.advance()?;
-            let next = self.get_slice_until_or_end(|c| !matches!(c, '0'..'9'));
+            let next = self.get_slice_until_or_end(|c| !matches!(c, '0'..='9'));
             if matches!(next, Err(LexingError::EOF) | Err(LexingError::EOL)) {
                 return Ok(Token::Symbol("-".to_string()));
             }
@@ -150,16 +150,15 @@ impl Lexer {
 
             if next.len() > 0 {
                 let number: String = next.iter().collect();
-                dbg!(&number);
                 self.advance_by(number.len())?;
                 let parsed = number.parse::<i64>()?;
                 return Ok(Token::IntLiteral(parsed * -1));
             }
             return Ok(Token::Symbol("-".to_string()));
         }
-        if matches!(ch, '0'..'9') {
+        if matches!(ch, '0'..='9') {
             let number: String = self
-                .get_slice_until_or_end(|c| !matches!(c, '0'..'9'))?
+                .get_slice_until_or_end(|c| !matches!(c, '0'..='9'))?
                 .iter()
                 .collect();
             self.advance_by(number.len())?;
