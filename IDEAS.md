@@ -112,3 +112,27 @@
   }
 })
 ```
+
+# Custom matchers
+
+```lisp
+(match 5 [
+  1 (print "one")
+  2 (print "two")
+  (any 3 4 5 :as x) (print "three, four, or five:" x)
+]) ; prints "three, four or five: 5"
+
+(match [1 2 3] [
+  (when [1 &rest] (> (len rest) 2)) (print "more than two:" rest)
+  (when [1 &rest] (= (len rest) 2)) (print "exactly two:" rest)
+  (when [1 &rest] (< (len rest) 2)) (print "less than two:" rest)
+]) ; prints "exactly two: [2 3]"
+
+(match "John Doe" [
+  (regex "^[^\s]+$" :as name) (print name.0)
+  (regex "^([^\s]+) ([^\s]+)$" :as name) {
+    (print "first name:" name.1)
+    (print "last name:" name.2)
+  }
+]) ; prints "first name: John", "last name: Doe"
+```
