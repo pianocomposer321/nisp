@@ -169,7 +169,6 @@ impl Scope {
 
                     for ind in 0..l.len() {
                         let left_expr = l[ind].clone();
-                        let right_val = r[ind].clone();
 
                         if let Ok(rest) = left_expr.clone().as_rest_op() {
                             found_rest = true;
@@ -178,7 +177,15 @@ impl Scope {
                             break;
                         }
 
-                        self.pattern_match_assign(left_expr, right_val)?;
+                        if ind < r.len() {
+                            let right_val = r[ind].clone();
+                            self.pattern_match_assign(left_expr, right_val)?;
+                        } else {
+                            return Err(EvalError::PatternMatchDoesNotMatch {
+                                left,
+                                right
+                            });
+                        }
                     }
 
                     if !found_rest {

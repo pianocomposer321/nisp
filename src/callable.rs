@@ -356,6 +356,29 @@ pub mod default_intrinsics {
         Ok(Value::Unit)
     }
 
+    fn set_match(mut scope: Scope, exprs: Vec<Expr>) -> Result<Value, EvalError> {
+        let mut iter = exprs.into_iter();
+        let left = iter
+            .next()
+            .ok_or(EvalError::NotEnoughArgs {
+                expected: 2,
+                got: 0,
+            })?;
+        let right = iter
+            .next()
+            .ok_or(EvalError::NotEnoughArgs {
+                expected: 2,
+                got: 1,
+            })?
+            .eval(scope.clone())?;
+
+        if let Ok(_) = scope.pattern_match_assign(left, right) {
+            Ok(Value::Bool(true))
+        } else {
+            Ok(Value::Bool(false))
+        }
+    }
+
     fn defn(mut scope: Scope, exprs: Vec<Expr>) -> Result<Value, EvalError> {
         let mut iter = exprs.into_iter();
         let function_name: String = iter
@@ -483,6 +506,7 @@ pub mod default_intrinsics {
     pub fn intrinsics() -> HashMap<String, Rc<Intrinsic>> {
         HashMap::from([
             make_intrinsic("set", set),
+            make_intrinsic("set-match", set_match),
             make_intrinsic("defn", defn),
             make_intrinsic("if", if_),
             make_intrinsic("match", match_),
