@@ -11,7 +11,16 @@ $ cargo run -- input.nisp
 ## Example
 
 ```lisp
-(let add (fn [a b] (+ a b)))
-(let x (add 1 2))
-(print x)
+(defn fib [n] {
+  (cond [
+    (= n 0) 1
+    (= n 1) 1
+    true (+ (fib (- n 1)) (fib (- n 2)))
+  ])
+})
+
+(fib 10) ; 45
+(fib 20) ; 955
 ```
+
+For more examples, see the [tests](https://github.com/composer/nisp/tree/master/tests).
