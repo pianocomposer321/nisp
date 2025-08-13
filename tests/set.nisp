@@ -1,0 +1,8 @@
+(defn main [] {
+  (set x 10)
+  (assert (= x 10))
+  (set x (+ x 1))
+  (assert (= x 11))
+  (set x (+ x 1))
+  (assert (= x 12))
+})
