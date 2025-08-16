@@ -671,6 +671,12 @@ mod test {
         assert_next_token_eq!(&mut l, Token::Symbol("b".to_string()));
         assert_eof!(&mut l);
 
+        let mut l = lex("a.1");
+        assert_next_token_eq!(&mut l, Token::Symbol("a".to_string()));
+        assert_next_token_eq!(&mut l, Token::Dot);
+        assert_next_token_eq!(&mut l, Token::IntLiteral(1));
+        assert_eof!(&mut l);
+
         Ok(())
     }
 }

@@ -37,6 +37,9 @@ pub enum EvalError {
     #[error("Undefined field on list {list:?}: {field}")]
     UndefinedField { list: Value, field: String },
 
+    #[error("Index out of bounds on list {list:?}: {index}")]
+    IndexOutOfBounds { list: Value, index: i64 },
+
     #[error("Assertion failed")]
     AssertionFailed,
 
@@ -100,20 +103,41 @@ impl Expr {
                 Ok(Value::MarkerPair(marker, Box::new(expr.eval(scope.clone())?)))
             }
             Expr::DotOp(left, right) => {
-                // TODO: this should use a cache instead of searching the list every time
                 let left = left.eval(scope.clone())?.as_list()?;
-                let right = right.as_symbol()?;
-                for value in left.iter() {
-                    if let Ok((marker, value)) = value.clone().as_marker_pair() {
-                        if *marker == right {
-                            return Ok(*value);
+                match *right {
+                    Expr::Symbol(name) => {
+                        // TODO: this should use a cache instead of searching the list every time
+                        for value in left.iter() {
+                            if let Ok((marker, value)) = value.clone().as_marker_pair() {
+                                if marker == name {
+                                    return Ok(*value);
+                                }
+                            }
                         }
+                        Err(EvalError::UndefinedField {
+                            list: Value::List(left),
+                            field: name.to_string(),
+                        })
+                    }
+                    Expr::Int(ind) => {
+                        if ind >= left.len() as i64 {
+                            return Err(EvalError::IndexOutOfBounds {
+                                list: Value::List(left),
+                                index: ind,
+                            });
+                        }
+
+                        let ind = ind as usize;
+                        let value = left[ind].clone();
+                        return Ok(value);
+                    }
+                    _ => {
+                        return Err(EvalError::TypeError {
+                            expected: "Symbol or Int".to_string(),
+                            got: right.type_name(),
+                        });
                     }
                 }
-                Err(EvalError::UndefinedField {
-                    list: Value::List(left),
-                    field: right,
-                })
             }
             _ => todo!(),
         }
@@ -981,6 +1005,20 @@ mod test {
         assert!(matches!(
             values.unwrap_err(),
             ExprTestError::EvalError(EvalError::UndefinedField { list: Value::List(_), field: _ })
+        ));
+
+        let scope = make_scope();
+        let mut values = eval(scope.clone(), "(set x [1 2 3]) x.0 x.1 x.2")?.into_iter();
+        assert_next_value_eq!(values, Value::Unit);
+        assert_next_value_eq!(values, Value::new_int(1));
+        assert_next_value_eq!(values, Value::new_int(2));
+        assert_next_value_eq!(values, Value::new_int(3));
+
+        let scope = make_scope();
+        let values = eval(scope.clone(), "(set x [1 2 3]) x.3");
+        assert!(matches!(
+            values.unwrap_err(),
+            ExprTestError::EvalError(EvalError::IndexOutOfBounds { list: Value::List(_), index: 3 })
         ));
 
         Ok(())

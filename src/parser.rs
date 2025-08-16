@@ -408,6 +408,9 @@ mod test {
         let mut p = parse("a.b");
         assert_next_expr_eq!(p, Expr::new_dot_op(Expr::Symbol(Rc::new("a".to_string())), Expr::Symbol(Rc::new("b".to_string()))));
 
+        let mut p = parse("a.1");
+        assert_next_expr_eq!(p, Expr::new_dot_op(Expr::Symbol(Rc::new("a".to_string())), Expr::Int(1)));
+
         Ok(())
     }
 }
