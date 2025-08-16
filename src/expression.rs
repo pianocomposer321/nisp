@@ -51,7 +51,7 @@ pub enum Expr {
     String(Rc<String>),
     Symbol(Rc<String>),
     SpreadOp(Rc<String>),
-    MarkerPair(Rc<String>, Rc<Expr>),
+    MarkerPair(Rc<String>, Box<Expr>),
     Unit,
 }
 
@@ -88,6 +88,9 @@ impl Expr {
             Expr::List(l) => {
                 let values = Expr::values(scope.clone(), l)?;
                 Ok(Value::new_list(values))
+            }
+            Expr::MarkerPair(marker, expr) => {
+                Ok(Value::MarkerPair(marker, Box::new(expr.eval(scope.clone())?)))
             }
             _ => todo!(),
         }
@@ -130,7 +133,7 @@ impl Expr {
     }
 
     pub fn new_marker_pair(marker: impl Into<String>, expr: Expr) -> Self {
-        Self::MarkerPair(Rc::new(marker.into()), Rc::new(expr))
+        Self::MarkerPair(Rc::new(marker.into()), Box::new(expr))
     }
 
     pub fn values(scope: Scope, exprs: Vec<Expr>) -> Result<Vec<Value>, EvalError> {
@@ -209,7 +212,7 @@ impl Expr {
         }
     }
 
-    pub fn as_marker_pair(self) -> Result<(Rc<String>, Rc<Expr>), EvalError> {
+    pub fn as_marker_pair(self) -> Result<(Rc<String>, Box<Expr>), EvalError> {
         match self {
             Expr::MarkerPair(marker, expr) => Ok((marker, expr)),
             _ => Err(EvalError::TypeError {
@@ -227,6 +230,7 @@ pub enum Value {
     FunctionDefn(Rc<FunctionDefn>),
     Bool(bool),
     List(Rc<Vec<Value>>),
+    MarkerPair(Rc<String>, Box<Value>),
     Unit,
 }
 
@@ -249,6 +253,15 @@ impl ToString for Value {
                     s.push_str(&value.to_string());
                 }
                 s.push(']');
+
+                s
+            }
+            Value::MarkerPair(marker, value) => {
+                let mut s = String::new();
+                s.push(':');
+                s.push_str(&marker.to_string());
+                s.push(' ');
+                s.push_str(&value.to_string());
 
                 s
             }
@@ -276,6 +289,10 @@ impl Value {
 
     pub fn new_list(l: Vec<Value>) -> Self {
         Value::List(Rc::new(l))
+    }
+
+    pub fn new_marker_pair(marker: impl Into<String>, value: Value) -> Self {
+        Value::MarkerPair(Rc::new(marker.into()), Box::new(value))
     }
 
     pub fn new_unit() -> Self {
@@ -339,6 +356,7 @@ impl Value {
             Value::FunctionDefn(_) => "FunctionDefn".to_string(),
             Value::Bool(_) => "Bool".to_string(),
             Value::List(_) => "List".to_string(),
+            Value::MarkerPair(_, _) => "MarkerPair".to_string(),
             Value::Unit => "Unit".to_string(),
         }
     }
@@ -785,7 +803,7 @@ mod test {
     }
 
     #[test]
-    fn set_pattern_match() -> ExprTestResult<()> {
+    fn eval_set_pattern_match() -> ExprTestResult<()> {
         let scope = scope();
         let mut values = eval(scope.clone(), "(set [a b] [1 2]) a b")?.into_iter();
         assert_next_value_eq!(values, Value::Unit);
@@ -796,7 +814,7 @@ mod test {
     }
 
     #[test]
-    fn set_match() -> ExprTestResult<()> {
+    fn eval_set_match() -> ExprTestResult<()> {
         let scope = scope();
         let mut values = eval(scope.clone(), "(set-match [a b] [1 2]) a b")?.into_iter();
         assert_next_value_eq!(values, Value::Bool(true));
@@ -812,6 +830,18 @@ mod test {
         assert_next_value_eq!(
             values,
             Value::new_list(vec![Value::new_int(2), Value::new_int(3)])
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn eval_list_with_marker() -> ExprTestResult<()> {
+        let scope = scope();
+        let mut values = eval(scope.clone(), "[:key 123]")?.into_iter();
+        assert_next_value_eq!(
+            values,
+            Value::new_list(vec![Value::new_marker_pair("key", Value::new_int(123))])
         );
 
         Ok(())
