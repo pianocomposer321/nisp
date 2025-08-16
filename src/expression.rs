@@ -892,4 +892,26 @@ mod test {
 
         Ok(())
     }
+
+    #[test]
+    fn eval_marker_out_of_order() -> ExprTestResult<()> {
+        let scope = scope();
+        let mut values = eval(scope.clone(), "(set [world hello] [:hello 1 :world 2]) world hello")?.into_iter();
+        assert_next_value_eq!(values, Value::Unit);
+        assert_next_value_eq!(values, Value::new_int(2));
+        assert_next_value_eq!(values, Value::new_int(1));
+
+        Ok(())
+    }
+
+    #[test]
+    fn eval_kwargs() -> ExprTestResult<()> {
+        let scope = scope();
+        let mut values = eval(scope.clone(), "(set [&args end] [1 2 3 :end \"hello\"]) args end")?.into_iter();
+        assert_next_value_eq!(values, Value::Unit);
+        assert_next_value_eq!(values, Value::new_list(vec![Value::new_int(1), Value::new_int(2), Value::new_int(3)]));
+        assert_next_value_eq!(values, Value::new_string("hello"));
+
+        Ok(())
+    }
 }

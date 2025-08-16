@@ -168,7 +168,8 @@ impl Scope {
                         }
                     }
 
-                    let mut rest_found = false;
+                    let mut rest = None;
+                    let mut rest_list: Vec<Value> = Vec::new();
                     for (ind, expr) in l.clone().into_iter().enumerate() {
                         if let Ok((marker, expr)) = expr.clone().as_marker_pair() {
                             if let Some(value) = pairs_map.get(&*marker) {
@@ -179,15 +180,25 @@ impl Scope {
                                     right: Value::List(r.clone()),
                                 });
                             }
-                        } else if let Ok(rest) = expr.clone().as_rest_op() {
-                            rest_found = true;
-                            let mut rest_list: Vec<Value> = pairs_list.iter().filter_map(|e| e.clone()).collect();
-                            let mut rest_map: Vec<Value> = pairs_map.iter().map(|(k, v)| Value::MarkerPair(k.clone(), v.clone())).collect();
-                            rest_list.append(&mut rest_map);
-                            self.pattern_match_assign(Expr::new_symbol(&rest), Value::List(Rc::new(rest_list)))?;
+                        } else if let Ok(rest_name) = expr.clone().as_rest_op() {
+                            rest = Some(rest_name);
+                            // rest_found = true;
+                            rest_list = pairs_list.iter().filter_map(|e| e.clone()).collect();
+                            // let mut rest_map: Vec<Value> = pairs_map.iter().map(|(k, v)| Value::MarkerPair(k.clone(), v.clone())).collect();
+                            // rest_list.append(&mut rest_map);
+                            // self.pattern_match_assign(Expr::new_symbol(&rest), Value::List(Rc::new(rest_list)))?;
                         } else {
                             if ind >= r.len() {
                                 return Err(EvalError::PatternMatchDoesNotMatch { left, right });
+                            }
+
+                            if let Ok(name) = l[ind].clone().as_symbol() {
+                                let name = Rc::new(name);
+                                if let Some(value) = pairs_map.get(&name) {
+                                    self.pattern_match_assign(expr, *value.clone())?;
+                                    pairs_map.remove(&name);
+                                    continue;
+                                }
                             }
 
                             if let Some(value) = pairs_list[ind].clone() {
@@ -196,8 +207,14 @@ impl Scope {
                             }
                         }
                     }
-                    if l.len() < r.len() && !rest_found {
+                    if l.len() < r.len() && rest.is_none() {
                         return Err(EvalError::PatternMatchDoesNotMatch { left, right });
+                    }
+
+                    if let Some(rest_name) = rest {
+                        let mut rest_map: Vec<Value> = pairs_map.iter().map(|(k, v)| Value::MarkerPair(k.clone(), v.clone())).collect();
+                        rest_list.append(&mut rest_map);
+                        self.pattern_match_assign(Expr::new_symbol(&rest_name), Value::List(Rc::new(rest_list)))?;
                     }
 
                     Ok(())
