@@ -3,20 +3,32 @@ use std::{fs, io};
 
 use thiserror::Error;
 
+use crate::parser::{ParsingError, ParsingResult};
+
 #[derive(Error, Debug)]
 pub enum LexingError {
     #[error("Unexpected End Of File while lexing")]
     EOL,
+
     #[error("Unexpected End Of File while lexing")]
     EOF,
+
     #[error("Unexpected token: expected {expected:?} but got {got:?}")]
     UnexpectedToken {
         position: usize,
         expected: Token,
         got: Token,
     },
+
+    #[error("Token type error: expected {expected:?} but got {got:?}")]
+    UnexpectedTokenType {
+        expected: String,
+        got: String,
+    },
+
     #[error("Unable to parse integer")]
     ParseIntError(#[from] std::num::ParseIntError),
+
     #[error(transparent)]
     IOError(#[from] std::io::Error),
 }
@@ -49,6 +61,32 @@ pub enum Token {
     SpreadOp,
     /// :marker
     Marker(String),
+}
+
+impl Token {
+    pub fn as_marker(&self) -> ParsingResult<String> {
+        match self {
+            Token::Marker(s) => Ok(s.clone()),
+            _ => Err(ParsingError::UnexpectedTokenType { expected: "Marker".to_string(), got: self.type_name() }),
+        }
+    }
+
+    pub fn type_name(&self) -> String {
+        match self {
+            Token::IntLiteral(_) => "IntLiteral".to_string(),
+            Token::StringLiteral(_) => "StringLiteral".to_string(),
+            Token::BoolLiteral(_) => "BoolLiteral".to_string(),
+            Token::SpreadOp => "SpreadOp".to_string(),
+            Token::Marker(_) => "Marker".to_string(),
+            Token::OpenParen => "OpenParen".to_string(),
+            Token::CloseParen => "CloseParen".to_string(),
+            Token::OpenBracket => "OpenBracket".to_string(),
+            Token::CloseBracket => "CloseBracket".to_string(),
+            Token::OpenBrace => "OpenBrace".to_string(),
+            Token::CloseBrace => "CloseBrace".to_string(),
+            Token::Symbol(_) => "Symbol".to_string(),
+        }
+    }
 }
 
 pub struct TokenIter<'a>(&'a mut Lexer);

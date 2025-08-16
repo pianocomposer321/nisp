@@ -3,8 +3,7 @@ use std::{cell::RefMut, rc::Rc};
 use thiserror::Error;
 
 use crate::{
-    callable::FunctionDefn,
-    scope::{Scope, ScopeError},
+    callable::FunctionDefn, parser::{ParsingError, ParsingResult}, scope::{Scope, ScopeError}
 };
 
 pub fn eval_block(scope: Scope, exprs: Vec<Expr>) -> Result<Value, EvalError> {
@@ -37,6 +36,9 @@ pub enum EvalError {
 
     #[error("Assertion failed")]
     AssertionFailed,
+
+    #[error(transparent)]
+    ParserError(#[from] crate::parser::ParsingError),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -49,6 +51,7 @@ pub enum Expr {
     String(Rc<String>),
     Symbol(Rc<String>),
     SpreadOp(Rc<String>),
+    MarkerPair(Rc<String>, Rc<Expr>),
     Unit,
 }
 
@@ -126,6 +129,10 @@ impl Expr {
         Self::Unit
     }
 
+    pub fn new_marker_pair(marker: impl Into<String>, expr: Expr) -> Self {
+        Self::MarkerPair(Rc::new(marker.into()), Rc::new(expr))
+    }
+
     pub fn values(scope: Scope, exprs: Vec<Expr>) -> Result<Vec<Value>, EvalError> {
         exprs.into_iter().map(|e| e.eval(scope.clone())).collect()
     }
@@ -140,6 +147,7 @@ impl Expr {
             Expr::Symbol(_) => "Symbol".to_string(),
             Expr::Bool(_) => "Bool".to_string(),
             Expr::SpreadOp(_) => "RestOp".to_string(),
+            Expr::MarkerPair(_, _) => "MarkerPair".to_string(),
             Expr::Unit => "Unit".to_string(),
         }
     }
@@ -196,6 +204,16 @@ impl Expr {
             Expr::SpreadOp(s) => Ok(nisp::unwrap_rc(s, |rc| rc.to_string())),
             _ => Err(EvalError::TypeError {
                 expected: "RestOp".to_string(),
+                got: self.type_name(),
+            }),
+        }
+    }
+
+    pub fn as_marker_pair(self) -> Result<(Rc<String>, Rc<Expr>), EvalError> {
+        match self {
+            Expr::MarkerPair(marker, expr) => Ok((marker, expr)),
+            _ => Err(EvalError::TypeError {
+                expected: "MarkerPair".to_string(),
                 got: self.type_name(),
             }),
         }

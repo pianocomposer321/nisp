@@ -11,11 +11,21 @@ use thiserror::Error;
 pub enum ParsingError {
     #[error("Unexpected End Of File while parsing")]
     UnexpectedEOF,
+
     #[error("Unexpected token: {0:?}")]
     UnexpectedToken(Token),
+
+    #[error("A marker was not expected in this list")]
+    UnexpectedMarker,
+
+    #[error("Unexpected token type: expected {expected:?} but got {got:?}")]
+    UnexpectedTokenType {
+        expected: String,
+        got: String,
+    },
 }
 
-type ParsingResult<T> = Result<T, ParsingError>;
+pub type ParsingResult<T> = Result<T, ParsingError>;
 
 pub struct Parser {
     tokens: Rc<[lexer::Token]>,
@@ -88,8 +98,7 @@ impl Parser {
             }
             Token::OpenBracket => {
                 self.advance();
-                let next_token = self.get_token()?;
-                if next_token == Token::CloseBracket {
+                if self.get_token()? == Token::CloseBracket {
                     self.advance();
                     Ok(Expr::List(vec![]))
                 } else {
@@ -133,6 +142,13 @@ impl Parser {
                 } else {
                     Err(ParsingError::UnexpectedToken(next_token))
                 }
+            }
+            Token::Marker(marker) => {
+                self.advance();
+                let mut parser = Parser::from(self);
+                let expr = parser.parse_next_expr()?;
+                self.advance();
+                Ok(Expr::new_marker_pair(marker, expr))
             }
             _ => {
                 self.advance();
@@ -362,6 +378,19 @@ mod test {
     fn parse_spread_operator() -> ParsingResult<()> {
         let mut p = parse("&rest");
         assert_next_expr_eq!(p, Expr::new_spread_op("rest"));
+
+        Ok(())
+    }
+
+    #[test]
+    fn parse_list_with_marker() -> ParsingResult<()> {
+        let mut p = parse("[:key 123]");
+        assert_next_expr_eq!(
+            p,
+            Expr::new_list(vec![
+                Expr::new_marker_pair("key", Expr::Int(123))
+            ])
+        );
 
         Ok(())
     }
