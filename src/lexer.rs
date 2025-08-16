@@ -47,6 +47,8 @@ pub enum Token {
     BoolLiteral(bool),
     /// &rest
     SpreadOp,
+    /// :marker
+    Marker(String),
 }
 
 pub struct TokenIter<'a>(&'a mut Lexer);
@@ -178,6 +180,15 @@ impl Lexer {
         if self.get_slice_until_or_end(|c| c.is_whitespace() || matches!(c, ')' | ']' | '}'))? == ['f', 'a', 'l', 's', 'e'] {
             self.advance_by(5)?;
             return Ok(Token::BoolLiteral(false));
+        }
+        if ch == ':' {
+            self.advance()?;
+            let marker: String = self
+                .get_slice_until_or_end(|c| c.is_whitespace() || matches!(c, ')' | ']' | '}'))?
+                .iter()
+                .collect();
+            self.advance_by(marker.len())?;
+            return Ok(Token::Marker(marker));
         }
 
         // Assume anything else is a symbol
@@ -582,6 +593,15 @@ mod test {
         assert_next_token_eq!(&mut l, Token::SpreadOp);
         assert_next_token_eq!(&mut l, Token::Symbol("rest".to_string()));
         assert_next_token_eq!(&mut l, Token::CloseBracket);
+        assert_eof!(&mut l);
+
+        Ok(())
+    }
+
+    #[test]
+    fn lex_marker() -> LexingResult<()> {
+        let mut l = lex(":marker");
+        assert_next_token_eq!(&mut l, Token::Marker("marker".to_string()));
         assert_eof!(&mut l);
 
         Ok(())
