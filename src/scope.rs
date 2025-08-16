@@ -158,55 +158,66 @@ impl Scope {
                         return Err(EvalError::PatternMatchDoesNotMatch { left, right });
                     }
 
-                    let mut found_rest = false;
-                    let mut rest_ind: Option<usize> = None;
-                    let mut rest_label: Option<String> = None;
-
-                    for ind in 0..l.len() {
-                        let left_expr = l[ind].clone();
-
-                        if let Ok(rest) = left_expr.clone().as_rest_op() {
-                            found_rest = true;
-                            rest_ind = Some(ind);
-                            rest_label = Some(rest.clone());
-                            break;
-                        }
-
-                        if ind < r.len() {
-                            let right_val = r[ind].clone();
-                            self.pattern_match_assign(left_expr, right_val)?;
+                    let mut pairs_map = HashMap::new();
+                    let mut pairs_list = vec![None; r.len()];
+                    for (ind, value) in r.iter().enumerate() {
+                        if let Ok((marker, value)) = value.clone().as_marker_pair() {
+                            pairs_map.insert(marker, value);
                         } else {
-                            return Err(EvalError::PatternMatchDoesNotMatch { left, right });
+                            pairs_list[ind] = Some(value.clone());
                         }
                     }
 
-                    if !found_rest {
-                        if l.len() != r.len() {
-                            return Err(EvalError::PatternMatchDoesNotMatch { left, right });
+                    let mut rest_found = false;
+                    for (ind, expr) in l.clone().into_iter().enumerate() {
+                        if let Ok((marker, expr)) = expr.clone().as_marker_pair() {
+                            if let Some(value) = pairs_map.get(&*marker) {
+                                self.pattern_match_assign(*expr, *value.clone())?;
+                                pairs_map.remove(&*marker);
+                            } else {
+                                return Err(EvalError::NoMatchingPattern {
+                                    right: Value::List(r.clone()),
+                                });
+                            }
+                        } else if let Ok(rest) = expr.clone().as_rest_op() {
+                            rest_found = true;
+                            let mut rest_list: Vec<Value> = pairs_list.iter().filter_map(|e| e.clone()).collect();
+                            let mut rest_map: Vec<Value> = pairs_map.iter().map(|(k, v)| Value::MarkerPair(k.clone(), v.clone())).collect();
+                            rest_list.append(&mut rest_map);
+                            self.pattern_match_assign(Expr::new_symbol(&rest), Value::List(Rc::new(rest_list)))?;
+                        } else {
+                            if ind >= r.len() {
+                                return Err(EvalError::PatternMatchDoesNotMatch { left, right });
+                            }
+
+                            if let Some(value) = pairs_list[ind].clone() {
+                                self.pattern_match_assign(expr, value)?;
+                                pairs_list[ind] = None;
+                            }
                         }
-                        return Ok(());
                     }
-
-                    let rest_ind = rest_ind.unwrap();
-                    let rest_label = rest_label.unwrap();
-                    let rest_len = (r.len() + 1) - l.len();
-                    let rest_end = rest_ind + rest_len;
-                    let rest_val = r[rest_ind..rest_end].to_vec();
-                    self.set_value(&rest_label, Value::List(Rc::new(rest_val)));
-
-                    for ind in rest_end..r.len() {
-                        let left_expr = l[ind].clone();
-                        let right_val = r[ind].clone();
-                        self.pattern_match_assign(left_expr, right_val)?;
+                    if l.len() < r.len() && !rest_found {
+                        return Err(EvalError::PatternMatchDoesNotMatch { left, right });
                     }
 
                     Ok(())
                 } else {
                     Err(EvalError::PatternMatchDoesNotMatch { left, right })
                 }
-            }
+            },
+            (Expr::MarkerPair(left_marker, expr), r) => {
+                let (right_marker, value) = r.as_marker_pair()?;
+                if left_marker == right_marker {
+                    self.pattern_match_assign(*expr, *value)?;
+                    Ok(())
+                } else {
+                    Err(EvalError::NoMatchingPattern {
+                        right: *value,
+                    })
+                }
+            },
             (left, _) => Err(EvalError::TypeError {
-                expected: "Symbol, Int, String, Bool, Unit, or List".to_string(),
+                expected: "Symbol, Int, String, Bool, Unit, List, or MarkerPair".to_string(),
                 got: left.type_name(),
             }),
         }

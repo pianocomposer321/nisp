@@ -437,7 +437,6 @@ pub mod default_intrinsics {
                 Ok(_) => {
                     let child_scope = Scope::child(scope.clone());
                     let value = eval_block(child_scope.clone(), body.as_block()?)?;
-                    dbg!(&value);
                     return Ok(value);
                 }
                 Err(EvalError::PatternMatchDoesNotMatch { left: _, right: _ }) => {

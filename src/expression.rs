@@ -81,7 +81,9 @@ impl Expr {
                 if let Ok(value) = scope.get_value(&name) {
                     return Ok(value);
                 }
-                todo!()
+                Err(EvalError::UndefinedVariable {
+                    name: name.to_string(),
+                })
             }
             Expr::Bool(b) => Ok(Value::Bool(b)),
             Expr::Block(b) => eval_block(Scope::child(scope), b),
@@ -334,6 +336,16 @@ impl Value {
             Value::Bool(b) => Ok(b),
             _ => Err(EvalError::TypeError {
                 expected: "Bool".to_string(),
+                got: self.type_name(),
+            }),
+        }
+    }
+
+    pub fn as_marker_pair(self) -> Result<(Rc<String>, Box<Value>), EvalError> {
+        match self {
+            Value::MarkerPair(marker, value) => Ok((marker, value)),
+            _ => Err(EvalError::TypeError {
+                expected: "MarkerPair".to_string(),
                 got: self.type_name(),
             }),
         }
@@ -843,6 +855,40 @@ mod test {
             values,
             Value::new_list(vec![Value::new_marker_pair("key", Value::new_int(123))])
         );
+
+        Ok(())
+    }
+
+    #[test]
+    fn eval_match_with_marker() -> ExprTestResult<()> {
+        let scope = scope();
+        let mut values = eval(
+            scope.clone(),
+            "(match [:key 123] [ [:key x] x ])",
+        )?.into_iter();
+        assert_next_value_eq!(values, Value::new_int(123));
+
+        Ok(())
+    }
+
+    #[test]
+    fn eval_set_with_marker() -> ExprTestResult<()> {
+        let scope = scope();
+        let mut values = eval(
+            scope.clone(),
+            "(set [:key x] [:key 123]) x",
+        )?.into_iter();
+        assert_next_value_eq!(values, Value::Unit);
+        assert_next_value_eq!(values, Value::new_int(123));
+
+        let values = eval(
+            scope.clone(),
+            "(set [:key x] [:other-key 123]) x",
+        );
+        assert!(matches!(
+            values.unwrap_err(),
+            ExprTestError::EvalError(EvalError::NoMatchingPattern { .. })
+        ));
 
         Ok(())
     }
