@@ -158,6 +158,8 @@ impl Scope {
                         return Err(EvalError::PatternMatchDoesNotMatch { left, right });
                     }
 
+                    // TODO: the map and list should be stored in the Value::List type instead of
+                    // being recreated here every time
                     let mut pairs_map = HashMap::new();
                     let mut pairs_list = vec![None; r.len()];
                     for (ind, value) in r.iter().enumerate() {
