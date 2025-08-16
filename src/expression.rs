@@ -36,7 +36,6 @@ pub enum EvalError {
     AssertionFailed,
 }
 
-// TODO: Values inside should be inside Rc
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Expr {
     Call(Rc<String>, Vec<Expr>),
