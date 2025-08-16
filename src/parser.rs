@@ -57,7 +57,7 @@ impl Parser {
 
     pub fn parse_next_expr(&mut self) -> ParsingResult<Expr> {
         let token = self.get_token()?;
-        match token {
+        let parsed_expr = match token {
             Token::IntLiteral(i) => {
                 self.advance();
                 Ok(Expr::Int(i))
@@ -154,6 +154,14 @@ impl Parser {
                 self.advance();
                 Err(ParsingError::UnexpectedToken(token))
             }
+        };
+
+        if let Ok(Token::Dot) = self.get_token() {
+            self.advance();
+            let right = self.parse_next_expr()?;
+            Ok(Expr::new_dot_op(parsed_expr?, right))
+        } else {
+            parsed_expr
         }
     }
 
@@ -391,6 +399,14 @@ mod test {
                 Expr::new_marker_pair("key", Expr::Int(123))
             ])
         );
+
+        Ok(())
+    }
+
+    #[test]
+    fn parse_dot() -> ParsingResult<()> {
+        let mut p = parse("a.b");
+        assert_next_expr_eq!(p, Expr::new_dot_op(Expr::Symbol(Rc::new("a".to_string())), Expr::Symbol(Rc::new("b".to_string()))));
 
         Ok(())
     }

@@ -52,6 +52,7 @@ pub enum Expr {
     Symbol(Rc<String>),
     SpreadOp(Rc<String>),
     MarkerPair(Rc<String>, Box<Expr>),
+    DotOp(Box<Expr>, Box<Expr>),
     Unit,
 }
 
@@ -138,6 +139,10 @@ impl Expr {
         Self::MarkerPair(Rc::new(marker.into()), Box::new(expr))
     }
 
+    pub fn new_dot_op(left: Expr, right: Expr) -> Self {
+        Self::DotOp(Box::new(left), Box::new(right))
+    }
+
     pub fn values(scope: Scope, exprs: Vec<Expr>) -> Result<Vec<Value>, EvalError> {
         exprs.into_iter().map(|e| e.eval(scope.clone())).collect()
     }
@@ -153,6 +158,7 @@ impl Expr {
             Expr::Bool(_) => "Bool".to_string(),
             Expr::SpreadOp(_) => "RestOp".to_string(),
             Expr::MarkerPair(_, _) => "MarkerPair".to_string(),
+            Expr::DotOp(_, _) => "DotOp".to_string(),
             Expr::Unit => "Unit".to_string(),
         }
     }

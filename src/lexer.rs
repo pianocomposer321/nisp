@@ -61,6 +61,8 @@ pub enum Token {
     SpreadOp,
     /// :marker
     Marker(String),
+    /// .
+    Dot,
 }
 
 impl Token {
@@ -85,6 +87,7 @@ impl Token {
             Token::OpenBrace => "OpenBrace".to_string(),
             Token::CloseBrace => "CloseBrace".to_string(),
             Token::Symbol(_) => "Symbol".to_string(),
+            Token::Dot => "Dot".to_string(),
         }
     }
 }
@@ -232,10 +235,14 @@ impl Lexer {
             self.advance_by(marker.len())?;
             return Ok(Token::Marker(marker));
         }
+        if ch == '.' {
+            self.advance()?;
+            return Ok(Token::Dot);
+        }
 
         // Assume anything else is a symbol
         let symbol: String = self
-            .get_slice_until_or_end(|c| c.is_whitespace() || matches!(c, ')' | ']' | '}'))?
+            .get_slice_until_or_end(|c| c.is_whitespace() || matches!(c, '.' | ')' | ']' | '}'))?
             .iter()
             .collect();
         self.advance_by(symbol.len())?;
@@ -647,6 +654,21 @@ mod test {
     fn lex_marker() -> LexingResult<()> {
         let mut l = lex(":marker");
         assert_next_token_eq!(&mut l, Token::Marker("marker".to_string()));
+        assert_eof!(&mut l);
+
+        Ok(())
+    }
+
+    #[test]
+    fn lex_dot() -> LexingResult<()> {
+        let mut l = lex(".");
+        assert_next_token_eq!(&mut l, Token::Dot);
+        assert_eof!(&mut l);
+
+        let mut l = lex("a.b");
+        assert_next_token_eq!(&mut l, Token::Symbol("a".to_string()));
+        assert_next_token_eq!(&mut l, Token::Dot);
+        assert_next_token_eq!(&mut l, Token::Symbol("b".to_string()));
         assert_eof!(&mut l);
 
         Ok(())
