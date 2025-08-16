@@ -176,8 +176,9 @@ impl Scope {
                                 self.pattern_match_assign(*expr, *value.clone())?;
                                 pairs_map.remove(&*marker);
                             } else {
-                                return Err(EvalError::NoMatchingPattern {
-                                    right: Value::List(r.clone()),
+                                return Err(EvalError::PatternMatchDoesNotMatch {
+                                    right: Value::List(r),
+                                    left: Expr::List(l),
                                 });
                             }
                         } else if let Ok(rest_name) = expr.clone().as_rest_op() {
@@ -204,7 +205,10 @@ impl Scope {
                             if let Some(value) = pairs_list[ind].clone() {
                                 self.pattern_match_assign(expr, value)?;
                                 pairs_list[ind] = None;
+                                continue;
                             }
+
+                            return Err(EvalError::PatternMatchDoesNotMatch { left, right });
                         }
                     }
                     if l.len() < r.len() && rest.is_none() {
@@ -228,8 +232,9 @@ impl Scope {
                     self.pattern_match_assign(*expr, *value)?;
                     Ok(())
                 } else {
-                    Err(EvalError::NoMatchingPattern {
+                    Err(EvalError::PatternMatchDoesNotMatch {
                         right: *value,
+                        left,
                     })
                 }
             },

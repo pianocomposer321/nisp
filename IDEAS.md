@@ -22,7 +22,7 @@
 (print map.last-name) ; prints "Doe"
 ```
 
-# Pattern matching (Partially implemented)
+# Pattern matching (Implemented)
 
 ```lisp
 (set [hello world] ["hello" "world"])
