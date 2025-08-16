@@ -34,6 +34,9 @@ pub enum EvalError {
     #[error("Undefined variable: {name}")]
     UndefinedVariable { name: String },
 
+    #[error("Undefined field on list {list:?}: {field}")]
+    UndefinedField { list: Value, field: String },
+
     #[error("Assertion failed")]
     AssertionFailed,
 
@@ -44,6 +47,7 @@ pub enum EvalError {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Expr {
     Call(Rc<String>, Vec<Expr>),
+    // TODO: this should cache marked pairs in a HashMap
     List(Vec<Expr>),
     Block(Vec<Expr>),
     Int(i64),
@@ -94,6 +98,22 @@ impl Expr {
             }
             Expr::MarkerPair(marker, expr) => {
                 Ok(Value::MarkerPair(marker, Box::new(expr.eval(scope.clone())?)))
+            }
+            Expr::DotOp(left, right) => {
+                // TODO: this should use a cache instead of searching the list every time
+                let left = left.eval(scope.clone())?.as_list()?;
+                let right = right.as_symbol()?;
+                for value in left.iter() {
+                    if let Ok((marker, value)) = value.clone().as_marker_pair() {
+                        if *marker == right {
+                            return Ok(*value);
+                        }
+                    }
+                }
+                Err(EvalError::UndefinedField {
+                    list: Value::List(left),
+                    field: right,
+                })
             }
             _ => todo!(),
         }
@@ -944,6 +964,24 @@ mod test {
         assert_next_value_eq!(values, Value::Unit);
         assert_next_value_eq!(values, Value::new_list(vec![Value::new_int(1), Value::new_int(2), Value::new_int(3)]));
         assert_next_value_eq!(values, Value::new_string("hello"));
+
+        Ok(())
+    }
+
+    #[test]
+    fn eval_dot() -> ExprTestResult<()> {
+        let scope = make_scope();
+        let mut values = eval(scope.clone(), "(set john-doe [:first-name \"John\" :last-name \"Doe\"]) john-doe.first-name john-doe.last-name")?.into_iter();
+        assert_next_value_eq!(values, Value::Unit);
+        assert_next_value_eq!(values, Value::new_string("John"));
+        assert_next_value_eq!(values, Value::new_string("Doe"));
+
+        let scope = make_scope();
+        let values = eval(scope.clone(), "(set john-doe [:first-name \"John\" :last-name \"Doe\"]) john-doe.middle-name");
+        assert!(matches!(
+            values.unwrap_err(),
+            ExprTestError::EvalError(EvalError::UndefinedField { list: Value::List(_), field: _ })
+        ));
 
         Ok(())
     }
