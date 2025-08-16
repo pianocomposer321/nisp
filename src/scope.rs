@@ -1,5 +1,5 @@
 use std::{
-    cell::{Ref, RefCell},
+    cell::RefCell,
     collections::HashMap,
     rc::Rc,
 };
@@ -218,16 +218,22 @@ impl Scope {
                     }
 
                     if let Some(rest_name) = rest {
-                        let mut rest_map: Vec<Value> = pairs_map.iter().map(|(k, v)| Value::MarkerPair(k.clone(), v.clone())).collect();
+                        let mut rest_map: Vec<Value> = pairs_map
+                            .iter()
+                            .map(|(k, v)| Value::MarkerPair(k.clone(), v.clone()))
+                            .collect();
                         rest_list.append(&mut rest_map);
-                        self.pattern_match_assign(Expr::new_symbol(&rest_name), Value::List(Rc::new(rest_list)))?;
+                        self.pattern_match_assign(
+                            Expr::new_symbol(&rest_name),
+                            Value::List(Rc::new(rest_list)),
+                        )?;
                     }
 
                     Ok(())
                 } else {
                     Err(EvalError::PatternMatchDoesNotMatch { left, right })
                 }
-            },
+            }
             (Expr::MarkerPair(left_marker, expr), r) => {
                 let (right_marker, value) = r.as_marker_pair()?;
                 if left_marker == right_marker {
@@ -239,7 +245,7 @@ impl Scope {
                         left,
                     })
                 }
-            },
+            }
             (left, _) => Err(EvalError::TypeError {
                 expected: "Symbol, Int, String, Bool, Unit, List, or MarkerPair".to_string(),
                 got: left.type_name(),

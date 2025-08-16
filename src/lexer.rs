@@ -21,10 +21,7 @@ pub enum LexingError {
     },
 
     #[error("Token type error: expected {expected:?} but got {got:?}")]
-    UnexpectedTokenType {
-        expected: String,
-        got: String,
-    },
+    UnexpectedTokenType { expected: String, got: String },
 
     #[error("Unable to parse integer")]
     ParseIntError(#[from] std::num::ParseIntError),
@@ -69,7 +66,10 @@ impl Token {
     pub fn as_marker(&self) -> ParsingResult<String> {
         match self {
             Token::Marker(s) => Ok(s.clone()),
-            _ => Err(ParsingError::UnexpectedTokenType { expected: "Marker".to_string(), got: self.type_name() }),
+            _ => Err(ParsingError::UnexpectedTokenType {
+                expected: "Marker".to_string(),
+                got: self.type_name(),
+            }),
         }
     }
 

@@ -1,9 +1,10 @@
-use std::{cell::RefMut, rc::Rc};
+use std::rc::Rc;
 
 use thiserror::Error;
 
 use crate::{
-    callable::FunctionDefn, parser::{ParsingError, ParsingResult}, scope::{Scope, ScopeError}
+    callable::FunctionDefn,
+    scope::{Scope, ScopeError},
 };
 
 pub fn eval_block(scope: Scope, exprs: Vec<Expr>) -> Result<Value, EvalError> {
@@ -99,9 +100,10 @@ impl Expr {
                 let values = Expr::values(scope.clone(), l)?;
                 Ok(Value::new_list(values))
             }
-            Expr::MarkerPair(marker, expr) => {
-                Ok(Value::MarkerPair(marker, Box::new(expr.eval(scope.clone())?)))
-            }
+            Expr::MarkerPair(marker, expr) => Ok(Value::MarkerPair(
+                marker,
+                Box::new(expr.eval(scope.clone())?),
+            )),
             Expr::DotOp(left, right) => {
                 let left = left.eval(scope.clone())?.as_list()?;
                 match *right {
@@ -912,10 +914,7 @@ mod test {
     #[test]
     fn eval_match_with_marker() -> ExprTestResult<()> {
         let scope = make_scope();
-        let mut values = eval(
-            scope.clone(),
-            "(match [:key 123] [ [:key x] x ])",
-        )?.into_iter();
+        let mut values = eval(scope.clone(), "(match [:key 123] [ [:key x] x ])")?.into_iter();
         assert_next_value_eq!(values, Value::new_int(123));
 
         Ok(())
@@ -924,18 +923,12 @@ mod test {
     #[test]
     fn eval_set_with_marker() -> ExprTestResult<()> {
         let scope = make_scope();
-        let mut values = eval(
-            scope.clone(),
-            "(set [:key x] [:key 123]) x",
-        )?.into_iter();
+        let mut values = eval(scope.clone(), "(set [:key x] [:key 123]) x")?.into_iter();
         assert_next_value_eq!(values, Value::Unit);
         assert_next_value_eq!(values, Value::new_int(123));
 
         let scope = make_scope();
-        let values = eval(
-            scope.clone(),
-            "(set [:key x] [:other-key 123]) x",
-        );
+        let values = eval(scope.clone(), "(set [:key x] [:other-key 123]) x");
         assert!(matches!(
             values.unwrap_err(),
             ExprTestError::EvalError(EvalError::PatternMatchDoesNotMatch { .. })
@@ -945,23 +938,18 @@ mod test {
         let mut values = eval(
             scope.clone(),
             "(set [last-name] [:last-name \"Doe\"]) last-name",
-        )?.into_iter();
+        )?
+        .into_iter();
         assert_next_value_eq!(values, Value::Unit);
         assert_next_value_eq!(values, Value::new_string("Doe"));
 
         let scope = make_scope();
-        let mut values = eval(
-            scope.clone(),
-            "(set [x] [1]) x",
-        )?.into_iter();
+        let mut values = eval(scope.clone(), "(set [x] [1]) x")?.into_iter();
         assert_next_value_eq!(values, Value::Unit);
         assert_next_value_eq!(values, Value::new_int(1));
 
         let scope = make_scope();
-        let values = eval(
-            scope.clone(),
-            "(set [first-name] [:last-name \"Doe\"])",
-        );
+        let values = eval(scope.clone(), "(set [first-name] [:last-name \"Doe\"])");
         assert!(matches!(
             values.unwrap_err(),
             ExprTestError::EvalError(EvalError::PatternMatchDoesNotMatch { .. })
@@ -973,7 +961,11 @@ mod test {
     #[test]
     fn eval_marker_out_of_order() -> ExprTestResult<()> {
         let scope = make_scope();
-        let mut values = eval(scope.clone(), "(set [world hello] [:hello 1 :world 2]) world hello")?.into_iter();
+        let mut values = eval(
+            scope.clone(),
+            "(set [world hello] [:hello 1 :world 2]) world hello",
+        )?
+        .into_iter();
         assert_next_value_eq!(values, Value::Unit);
         assert_next_value_eq!(values, Value::new_int(2));
         assert_next_value_eq!(values, Value::new_int(1));
@@ -984,9 +976,20 @@ mod test {
     #[test]
     fn eval_kwargs() -> ExprTestResult<()> {
         let scope = make_scope();
-        let mut values = eval(scope.clone(), "(set [&args end] [1 2 3 :end \"hello\"]) args end")?.into_iter();
+        let mut values = eval(
+            scope.clone(),
+            "(set [&args end] [1 2 3 :end \"hello\"]) args end",
+        )?
+        .into_iter();
         assert_next_value_eq!(values, Value::Unit);
-        assert_next_value_eq!(values, Value::new_list(vec![Value::new_int(1), Value::new_int(2), Value::new_int(3)]));
+        assert_next_value_eq!(
+            values,
+            Value::new_list(vec![
+                Value::new_int(1),
+                Value::new_int(2),
+                Value::new_int(3)
+            ])
+        );
         assert_next_value_eq!(values, Value::new_string("hello"));
 
         Ok(())
@@ -1001,10 +1004,16 @@ mod test {
         assert_next_value_eq!(values, Value::new_string("Doe"));
 
         let scope = make_scope();
-        let values = eval(scope.clone(), "(set john-doe [:first-name \"John\" :last-name \"Doe\"]) john-doe.middle-name");
+        let values = eval(
+            scope.clone(),
+            "(set john-doe [:first-name \"John\" :last-name \"Doe\"]) john-doe.middle-name",
+        );
         assert!(matches!(
             values.unwrap_err(),
-            ExprTestError::EvalError(EvalError::UndefinedField { list: Value::List(_), field: _ })
+            ExprTestError::EvalError(EvalError::UndefinedField {
+                list: Value::List(_),
+                field: _
+            })
         ));
 
         let scope = make_scope();
@@ -1018,7 +1027,10 @@ mod test {
         let values = eval(scope.clone(), "(set x [1 2 3]) x.3");
         assert!(matches!(
             values.unwrap_err(),
-            ExprTestError::EvalError(EvalError::IndexOutOfBounds { list: Value::List(_), index: 3 })
+            ExprTestError::EvalError(EvalError::IndexOutOfBounds {
+                list: Value::List(_),
+                index: 3
+            })
         ));
 
         Ok(())

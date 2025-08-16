@@ -1,11 +1,10 @@
 use std::{
     fmt,
-    rc::Rc,
     sync::atomic::{AtomicUsize, Ordering},
 };
 
 use crate::{
-    expression::{eval_block, EvalError, Expr, Value},
+    expression::{EvalError, Expr, Value, eval_block},
     scope::Scope,
 };
 

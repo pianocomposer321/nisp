@@ -19,10 +19,7 @@ pub enum ParsingError {
     UnexpectedMarker,
 
     #[error("Unexpected token type: expected {expected:?} but got {got:?}")]
-    UnexpectedTokenType {
-        expected: String,
-        got: String,
-    },
+    UnexpectedTokenType { expected: String, got: String },
 }
 
 pub type ParsingResult<T> = Result<T, ParsingError>;
@@ -174,10 +171,6 @@ impl Parser {
 
     fn advance(&mut self) {
         self.position += 1;
-    }
-
-    fn advance_by(&mut self, n: usize) {
-        self.position += n;
     }
 }
 
@@ -395,9 +388,7 @@ mod test {
         let mut p = parse("[:key 123]");
         assert_next_expr_eq!(
             p,
-            Expr::new_list(vec![
-                Expr::new_marker_pair("key", Expr::Int(123))
-            ])
+            Expr::new_list(vec![Expr::new_marker_pair("key", Expr::Int(123))])
         );
 
         Ok(())
@@ -406,10 +397,19 @@ mod test {
     #[test]
     fn parse_dot() -> ParsingResult<()> {
         let mut p = parse("a.b");
-        assert_next_expr_eq!(p, Expr::new_dot_op(Expr::Symbol(Rc::new("a".to_string())), Expr::Symbol(Rc::new("b".to_string()))));
+        assert_next_expr_eq!(
+            p,
+            Expr::new_dot_op(
+                Expr::Symbol(Rc::new("a".to_string())),
+                Expr::Symbol(Rc::new("b".to_string()))
+            )
+        );
 
         let mut p = parse("a.1");
-        assert_next_expr_eq!(p, Expr::new_dot_op(Expr::Symbol(Rc::new("a".to_string())), Expr::Int(1)));
+        assert_next_expr_eq!(
+            p,
+            Expr::new_dot_op(Expr::Symbol(Rc::new("a".to_string())), Expr::Int(1))
+        );
 
         Ok(())
     }
