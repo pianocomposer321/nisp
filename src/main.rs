@@ -3,6 +3,7 @@ pub mod expression;
 pub mod lexer;
 pub mod parser;
 pub mod scope;
+pub mod value;
 
 use std::io;
 

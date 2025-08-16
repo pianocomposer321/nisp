@@ -8,7 +8,8 @@ use thiserror::Error;
 
 use crate::{
     callable::{Builtin, BuiltinBodyFn, FunctionBody, Intrinsic, IntrinsicBody, IntrinsicBodyFn},
-    expression::{EvalError, Expr, Value},
+    expression::{EvalError, Expr},
+    value::Value,
 };
 
 #[derive(Error, Debug)]

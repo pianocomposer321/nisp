@@ -4,8 +4,9 @@ use std::{
 };
 
 use crate::{
-    expression::{EvalError, Expr, Value, eval_block},
+    expression::{EvalError, Expr, eval_block},
     scope::Scope,
+    value::Value,
 };
 
 #[derive(Debug)]
