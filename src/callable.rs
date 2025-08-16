@@ -1,9 +1,11 @@
 use std::{
-    fmt, rc::Rc, sync::atomic::{AtomicUsize, Ordering}
+    fmt,
+    rc::Rc,
+    sync::atomic::{AtomicUsize, Ordering},
 };
 
 use crate::{
-    expression::{eval_block, EvalError, Expr, Value},
+    expression::{EvalError, Expr, Value, eval_block},
     scope::Scope,
 };
 
@@ -157,28 +159,27 @@ pub mod default_builtins {
 
     fn eq(vals: Vec<Value>) -> Result<Value, EvalError> {
         let mut iter = vals.into_iter();
-        let left = iter
-            .next()
-            .ok_or(EvalError::NotEnoughArgs {
-                expected: 2,
-                got: 0,
-            })?;
-        let right = iter
-            .next()
-            .ok_or(EvalError::NotEnoughArgs {
-                expected: 2,
-                got: 1,
-            })?;
+        let left = iter.next().ok_or(EvalError::NotEnoughArgs {
+            expected: 2,
+            got: 0,
+        })?;
+        let right = iter.next().ok_or(EvalError::NotEnoughArgs {
+            expected: 2,
+            got: 1,
+        })?;
         Ok(Value::Bool(left == right))
     }
 
     fn sub(vals: Vec<Value>) -> Result<Value, EvalError> {
         let mut iter = vals.into_iter();
 
-        let mut diff = iter.next().ok_or(EvalError::NotEnoughArgs {
-            expected: 2,
-            got: 0,
-        })?.as_int()?;
+        let mut diff = iter
+            .next()
+            .ok_or(EvalError::NotEnoughArgs {
+                expected: 2,
+                got: 0,
+            })?
+            .as_int()?;
 
         for value in iter {
             diff -= value.as_int()?;
@@ -189,69 +190,53 @@ pub mod default_builtins {
 
     fn geq(vals: Vec<Value>) -> Result<Value, EvalError> {
         let mut iter = vals.into_iter();
-        let left = iter
-            .next()
-            .ok_or(EvalError::NotEnoughArgs {
-                expected: 2,
-                got: 0,
-            })?;
-        let right = iter
-            .next()
-            .ok_or(EvalError::NotEnoughArgs {
-                expected: 2,
-                got: 1,
-            })?;
+        let left = iter.next().ok_or(EvalError::NotEnoughArgs {
+            expected: 2,
+            got: 0,
+        })?;
+        let right = iter.next().ok_or(EvalError::NotEnoughArgs {
+            expected: 2,
+            got: 1,
+        })?;
         Ok(Value::Bool(left.as_int()? >= right.as_int()?))
     }
 
     fn leq(vals: Vec<Value>) -> Result<Value, EvalError> {
         let mut iter = vals.into_iter();
-        let left = iter
-            .next()
-            .ok_or(EvalError::NotEnoughArgs {
-                expected: 2,
-                got: 0,
-            })?;
-        let right = iter
-            .next()
-            .ok_or(EvalError::NotEnoughArgs {
-                expected: 2,
-                got: 1,
-            })?;
+        let left = iter.next().ok_or(EvalError::NotEnoughArgs {
+            expected: 2,
+            got: 0,
+        })?;
+        let right = iter.next().ok_or(EvalError::NotEnoughArgs {
+            expected: 2,
+            got: 1,
+        })?;
         Ok(Value::Bool(left.as_int()? <= right.as_int()?))
     }
 
     fn gt(vals: Vec<Value>) -> Result<Value, EvalError> {
         let mut iter = vals.into_iter();
-        let left = iter
-            .next()
-            .ok_or(EvalError::NotEnoughArgs {
-                expected: 2,
-                got: 0,
-            })?;
-        let right = iter
-            .next()
-            .ok_or(EvalError::NotEnoughArgs {
-                expected: 2,
-                got: 1,
-            })?;
+        let left = iter.next().ok_or(EvalError::NotEnoughArgs {
+            expected: 2,
+            got: 0,
+        })?;
+        let right = iter.next().ok_or(EvalError::NotEnoughArgs {
+            expected: 2,
+            got: 1,
+        })?;
         Ok(Value::Bool(left.as_int()? > right.as_int()?))
     }
 
     fn lt(vals: Vec<Value>) -> Result<Value, EvalError> {
         let mut iter = vals.into_iter();
-        let left = iter
-            .next()
-            .ok_or(EvalError::NotEnoughArgs {
-                expected: 2,
-                got: 0,
-            })?;
-        let right = iter
-            .next()
-            .ok_or(EvalError::NotEnoughArgs {
-                expected: 2,
-                got: 1,
-            })?;
+        let left = iter.next().ok_or(EvalError::NotEnoughArgs {
+            expected: 2,
+            got: 0,
+        })?;
+        let right = iter.next().ok_or(EvalError::NotEnoughArgs {
+            expected: 2,
+            got: 1,
+        })?;
         Ok(Value::Bool(left.as_int()? < right.as_int()?))
     }
 
@@ -269,12 +254,10 @@ pub mod default_builtins {
 
     fn string(vals: Vec<Value>) -> Result<Value, EvalError> {
         let mut iter = vals.into_iter();
-        let value = iter
-            .next()
-            .ok_or(EvalError::NotEnoughArgs {
-                expected: 1,
-                got: 0,
-            })?;
+        let value = iter.next().ok_or(EvalError::NotEnoughArgs {
+            expected: 1,
+            got: 0,
+        })?;
 
         Ok(Value::String(Rc::new(value.to_string())))
     }
@@ -303,7 +286,10 @@ pub mod default_builtins {
     }
 
     fn make_builtin(name: &str, body: impl BuiltinBodyFn) -> (String, Rc<Builtin>) {
-        (name.to_string(), Rc::new(Builtin::new(name, FunctionBody::new(body))))
+        (
+            name.to_string(),
+            Rc::new(Builtin::new(name, FunctionBody::new(body))),
+        )
     }
 
     pub fn builtins() -> HashMap<String, Rc<Builtin>> {
@@ -338,12 +324,10 @@ pub mod default_intrinsics {
 
     fn set(mut scope: Scope, exprs: Vec<Expr>) -> Result<Value, EvalError> {
         let mut iter = exprs.into_iter();
-        let left = iter
-            .next()
-            .ok_or(EvalError::NotEnoughArgs {
-                expected: 2,
-                got: 0,
-            })?;
+        let left = iter.next().ok_or(EvalError::NotEnoughArgs {
+            expected: 2,
+            got: 0,
+        })?;
         let right = iter
             .next()
             .ok_or(EvalError::NotEnoughArgs {
@@ -358,12 +342,10 @@ pub mod default_intrinsics {
 
     fn set_match(mut scope: Scope, exprs: Vec<Expr>) -> Result<Value, EvalError> {
         let mut iter = exprs.into_iter();
-        let left = iter
-            .next()
-            .ok_or(EvalError::NotEnoughArgs {
-                expected: 2,
-                got: 0,
-            })?;
+        let left = iter.next().ok_or(EvalError::NotEnoughArgs {
+            expected: 2,
+            got: 0,
+        })?;
         let right = iter
             .next()
             .ok_or(EvalError::NotEnoughArgs {
@@ -388,12 +370,10 @@ pub mod default_intrinsics {
                 got: 0,
             })?
             .as_symbol()?;
-        let args = iter
-            .next()
-            .ok_or(EvalError::NotEnoughArgs {
-                expected: 3,
-                got: 1,
-            })?;
+        let args = iter.next().ok_or(EvalError::NotEnoughArgs {
+            expected: 3,
+            got: 1,
+        })?;
         let body: Vec<Expr> = iter
             .next()
             .ok_or(EvalError::NotEnoughArgs {
@@ -417,18 +397,14 @@ pub mod default_intrinsics {
                 got: 0,
             })?
             .eval(scope.clone())?;
-        let left = iter
-            .next()
-            .ok_or(EvalError::NotEnoughArgs {
-                expected: 3,
-                got: 1,
-            })?;
-        let right = iter
-            .next()
-            .ok_or(EvalError::NotEnoughArgs {
-                expected: 3,
-                got: 2,
-            })?;
+        let left = iter.next().ok_or(EvalError::NotEnoughArgs {
+            expected: 3,
+            got: 1,
+        })?;
+        let right = iter.next().ok_or(EvalError::NotEnoughArgs {
+            expected: 3,
+            got: 2,
+        })?;
 
         if condition.as_bool()? {
             left.eval(scope.clone())
@@ -438,7 +414,6 @@ pub mod default_intrinsics {
     }
 
     fn match_(mut scope: Scope, exprs: Vec<Expr>) -> Result<Value, EvalError> {
-
         let mut iter = exprs.into_iter();
         let value = iter
             .next()
@@ -464,10 +439,10 @@ pub mod default_intrinsics {
                     let value = eval_block(child_scope.clone(), body.as_block()?)?;
                     dbg!(&value);
                     return Ok(value);
-                },
+                }
                 Err(EvalError::PatternMatchDoesNotMatch { left: _, right: _ }) => {
                     continue;
-                },
+                }
                 Err(e) => {
                     return Err(e);
                 }
@@ -500,7 +475,10 @@ pub mod default_intrinsics {
     }
 
     fn make_intrinsic(name: &str, body: impl IntrinsicBodyFn) -> (String, Rc<Intrinsic>) {
-        (name.to_string(), Rc::new(Intrinsic::new(name, IntrinsicBody::new(body))))
+        (
+            name.to_string(),
+            Rc::new(Intrinsic::new(name, IntrinsicBody::new(body))),
+        )
     }
 
     pub fn intrinsics() -> HashMap<String, Rc<Intrinsic>> {

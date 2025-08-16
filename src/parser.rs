@@ -245,7 +245,10 @@ mod test {
     #[test]
     fn parse_call() -> ParsingResult<()> {
         let mut p = parse("(foo 123)");
-        assert_next_expr_eq!(p, Expr::Call(Rc::new("foo".to_string()), vec![Expr::Int(123)]));
+        assert_next_expr_eq!(
+            p,
+            Expr::Call(Rc::new("foo".to_string()), vec![Expr::Int(123)])
+        );
 
         Ok(())
     }
@@ -279,10 +282,7 @@ mod test {
                 vec![
                     Expr::List(vec![
                         Expr::new_symbol("bar"),
-                        Expr::new_call(
-                            "baz",
-                            vec![Expr::Int(123), Expr::new_string("hello")]
-                        ),
+                        Expr::new_call("baz", vec![Expr::Int(123), Expr::new_string("hello")]),
                         Expr::new_symbol("qux"),
                     ]),
                     Expr::new_symbol("quux"),
@@ -302,15 +302,9 @@ mod test {
         );
         assert_next_expr_eq!(
             p,
-            Expr::new_call(
-                "print",
-                vec![Expr::new_string("hello, world")]
-            )
+            Expr::new_call("print", vec![Expr::new_string("hello, world")])
         );
-        assert_next_expr_eq!(
-            p,
-            Expr::new_call("+", vec![Expr::Int(123), Expr::Int(456)])
-        );
+        assert_next_expr_eq!(p, Expr::new_call("+", vec![Expr::Int(123), Expr::Int(456)]));
 
         Ok(())
     }
@@ -324,14 +318,8 @@ mod test {
                 "defn",
                 vec![
                     Expr::new_symbol("foo"),
-                    Expr::new_list(vec![
-                        Expr::new_symbol("x"),
-                        Expr::new_symbol("y")
-                    ]),
-                    Expr::new_call(
-                        "+",
-                        vec![Expr::new_symbol("x"), Expr::new_symbol("y")]
-                    ),
+                    Expr::new_list(vec![Expr::new_symbol("x"), Expr::new_symbol("y")]),
+                    Expr::new_call("+", vec![Expr::new_symbol("x"), Expr::new_symbol("y")]),
                 ]
             )
         );
@@ -353,11 +341,16 @@ mod test {
     #[test]
     fn parse_if() -> ParsingResult<()> {
         let mut p = parse("(if true 1 2)");
-        assert_next_expr_eq!(p, Expr::new_call("if", vec![Expr::Bool(true), Expr::Int(1), Expr::Int(2)]));
-
+        assert_next_expr_eq!(
+            p,
+            Expr::new_call("if", vec![Expr::Bool(true), Expr::Int(1), Expr::Int(2)])
+        );
 
         let mut p = parse("(if false 1 2)");
-        assert_next_expr_eq!(p, Expr::new_call("if", vec![Expr::Bool(false), Expr::Int(1), Expr::Int(2)]));
+        assert_next_expr_eq!(
+            p,
+            Expr::new_call("if", vec![Expr::Bool(false), Expr::Int(1), Expr::Int(2)])
+        );
 
         let mut p = parse("(assert false)");
         assert_next_expr_eq!(p, Expr::new_call("assert", vec![Expr::Bool(false)]));

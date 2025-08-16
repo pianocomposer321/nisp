@@ -54,7 +54,9 @@ impl Scope {
         }
     }
 
-    pub fn from(builtins_and_intrinsics: (HashMap<String, Rc<Builtin>>, HashMap<String, Rc<Intrinsic>>)) -> Self {
+    pub fn from(
+        builtins_and_intrinsics: (HashMap<String, Rc<Builtin>>, HashMap<String, Rc<Intrinsic>>),
+    ) -> Self {
         let (builtins, intrinsics) = builtins_and_intrinsics;
         Self {
             builtins,
@@ -89,7 +91,9 @@ impl Scope {
         {
             Ok(value)
         } else {
-            Err(EvalError::UndefinedVariable { name: name.to_string() })
+            Err(EvalError::UndefinedVariable {
+                name: name.to_string(),
+            })
         }
     }
 
@@ -111,56 +115,47 @@ impl Scope {
     pub fn pattern_match_assign(&mut self, left: Expr, right: Value) -> Result<(), EvalError> {
         match (left.clone(), right.clone()) {
             (Expr::Int(l), r) => {
-                if let Value::Int(r) = r && l == r {
+                if let Value::Int(r) = r
+                    && l == r
+                {
                     Ok(())
                 } else {
-                    Err(EvalError::PatternMatchDoesNotMatch {
-                        left,
-                        right,
-                    })
+                    Err(EvalError::PatternMatchDoesNotMatch { left, right })
                 }
-            },
+            }
             (Expr::Symbol(l), r) => {
                 self.set_value(&l, r);
                 Ok(())
-            },
+            }
             (Expr::Bool(l), r) => {
-                if let Value::Bool(r) = r && l == r {
+                if let Value::Bool(r) = r
+                    && l == r
+                {
                     Ok(())
                 } else {
-                    Err(EvalError::PatternMatchDoesNotMatch {
-                        left,
-                        right,
-                    })
+                    Err(EvalError::PatternMatchDoesNotMatch { left, right })
                 }
-            },
+            }
             (Expr::Unit, r) => {
                 if let Value::Unit = r {
                     Ok(())
                 } else {
-                    Err(EvalError::PatternMatchDoesNotMatch {
-                        left,
-                        right,
-                    })
+                    Err(EvalError::PatternMatchDoesNotMatch { left, right })
                 }
-            },
+            }
             (Expr::String(l), r) => {
-                if let Value::String(r) = r && l == r {
+                if let Value::String(r) = r
+                    && l == r
+                {
                     Ok(())
                 } else {
-                    Err(EvalError::PatternMatchDoesNotMatch {
-                        left,
-                        right,
-                    })
+                    Err(EvalError::PatternMatchDoesNotMatch { left, right })
                 }
-            },
+            }
             (Expr::List(l), r) => {
                 if let Value::List(r) = r {
                     if l.len() > r.len() + 1 {
-                        return Err(EvalError::PatternMatchDoesNotMatch {
-                            left,
-                            right
-                        });
+                        return Err(EvalError::PatternMatchDoesNotMatch { left, right });
                     }
 
                     let mut found_rest = false;
@@ -181,19 +176,13 @@ impl Scope {
                             let right_val = r[ind].clone();
                             self.pattern_match_assign(left_expr, right_val)?;
                         } else {
-                            return Err(EvalError::PatternMatchDoesNotMatch {
-                                left,
-                                right
-                            });
+                            return Err(EvalError::PatternMatchDoesNotMatch { left, right });
                         }
                     }
 
                     if !found_rest {
                         if l.len() != r.len() {
-                            return Err(EvalError::PatternMatchDoesNotMatch {
-                                left,
-                                right
-                            });
+                            return Err(EvalError::PatternMatchDoesNotMatch { left, right });
                         }
                         return Ok(());
                     }
@@ -213,10 +202,7 @@ impl Scope {
 
                     Ok(())
                 } else {
-                    Err(EvalError::PatternMatchDoesNotMatch {
-                        left,
-                        right,
-                    })
+                    Err(EvalError::PatternMatchDoesNotMatch { left, right })
                 }
             }
             (left, _) => Err(EvalError::TypeError {

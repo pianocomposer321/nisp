@@ -2,7 +2,10 @@ use std::{cell::RefMut, rc::Rc};
 
 use thiserror::Error;
 
-use crate::{callable::FunctionDefn, scope::{Scope, ScopeError}};
+use crate::{
+    callable::FunctionDefn,
+    scope::{Scope, ScopeError},
+};
 
 pub fn eval_block(scope: Scope, exprs: Vec<Expr>) -> Result<Value, EvalError> {
     let values = Expr::values(scope.clone(), exprs)?;
@@ -65,7 +68,10 @@ impl Expr {
                 }
 
                 let function = scope.get_value(&name)?.as_function_defn()?;
-                child_scope.pattern_match_assign(Expr::List(function.args()?), Value::new_list(Expr::values(scope.clone(), args)?))?;
+                child_scope.pattern_match_assign(
+                    Expr::List(function.args()?),
+                    Value::new_list(Expr::values(scope.clone(), args)?),
+                )?;
                 function.call(child_scope.clone())
             }
             Expr::Symbol(name) => {
@@ -79,7 +85,7 @@ impl Expr {
             Expr::List(l) => {
                 let values = Expr::values(scope.clone(), l)?;
                 Ok(Value::new_list(values))
-            },
+            }
             _ => todo!(),
         }
     }
@@ -115,16 +121,13 @@ impl Expr {
     pub fn new_spread_op(s: &str) -> Self {
         Self::SpreadOp(Rc::new(s.to_string()))
     }
-    
+
     pub fn new_unit() -> Self {
         Self::Unit
     }
 
     pub fn values(scope: Scope, exprs: Vec<Expr>) -> Result<Vec<Value>, EvalError> {
-        exprs
-            .into_iter()
-            .map(|e| e.eval(scope.clone()))
-            .collect()
+        exprs.into_iter().map(|e| e.eval(scope.clone())).collect()
     }
 
     pub fn type_name(&self) -> String {
@@ -230,7 +233,7 @@ impl ToString for Value {
                 s.push(']');
 
                 s
-            },
+            }
             Value::Unit => "()".to_string(),
         }
     }
@@ -325,7 +328,7 @@ impl Value {
 
 #[cfg(test)]
 mod test {
-    use std::fs::{read_to_string, File};
+    use std::fs::{File, read_to_string};
 
     use crate::callable::{default_builtins, default_intrinsics};
 
@@ -440,7 +443,11 @@ mod test {
     #[test]
     fn eval_defn_with_block() -> ExprTestResult<()> {
         let scope = scope();
-        let mut values = eval(scope.clone(), "(defn f [x] { (set y (+ x 1)) (set z (+ x 2)) (+ y z) })")?.into_iter();
+        let mut values = eval(
+            scope.clone(),
+            "(defn f [x] { (set y (+ x 1)) (set z (+ x 2)) (+ y z) })",
+        )?
+        .into_iter();
         assert_next_value_eq!(values, Value::new_unit());
 
         let mut values = eval(scope.clone(), "(f 1)")?.into_iter();
@@ -476,7 +483,11 @@ mod test {
     #[test]
     fn eval_recursive_function() -> ExprTestResult<()> {
         let scope = scope();
-        let mut values = eval(scope.clone(), "(defn f [x] (if (= x 10) 10 (f (+ x 1)))) (f 1)")?.into_iter();
+        let mut values = eval(
+            scope.clone(),
+            "(defn f [x] (if (= x 10) 10 (f (+ x 1)))) (f 1)",
+        )?
+        .into_iter();
         assert_next_value_eq!(values, Value::new_unit());
         assert_next_value_eq!(values, Value::new_int(10));
 
@@ -500,7 +511,10 @@ mod test {
         assert_next_value_eq!(values, Value::new_unit());
 
         let values = eval(scope.clone(), "(assert (= 1 2))");
-        assert!(matches!(values.unwrap_err(), ExprTestError::EvalError(EvalError::AssertionFailed)));
+        assert!(matches!(
+            values.unwrap_err(),
+            ExprTestError::EvalError(EvalError::AssertionFailed)
+        ));
         Ok(())
     }
 
@@ -583,7 +597,10 @@ mod test {
     fn eval_test_files() -> ExprTestResult<()> {
         use walkdir::WalkDir;
 
-        for entry in WalkDir::new("tests").into_iter().filter(|e| !e.as_ref().unwrap().path().is_dir()) {
+        for entry in WalkDir::new("tests")
+            .into_iter()
+            .filter(|e| !e.as_ref().unwrap().path().is_dir())
+        {
             let contents = read_to_string(entry.unwrap().path()).unwrap();
             let scope = scope();
             eval(scope.clone(), contents.as_str())?;
@@ -610,14 +627,25 @@ mod test {
     fn eval_list() -> ExprTestResult<()> {
         let scope = scope();
         let mut values = eval(scope.clone(), "[1 2 3]")?.into_iter();
-        assert_next_value_eq!(values, Value::new_list(vec![Value::new_int(1), Value::new_int(2), Value::new_int(3)]));
+        assert_next_value_eq!(
+            values,
+            Value::new_list(vec![
+                Value::new_int(1),
+                Value::new_int(2),
+                Value::new_int(3)
+            ])
+        );
 
         Ok(())
     }
 
     #[test]
     fn list_to_string() -> ExprTestResult<()> {
-        let list = Value::new_list(vec![Value::new_int(1), Value::new_int(2), Value::new_int(3)]);
+        let list = Value::new_list(vec![
+            Value::new_int(1),
+            Value::new_int(2),
+            Value::new_int(3),
+        ]);
         assert_eq!(list.to_string(), "[1, 2, 3]");
 
         Ok(())
@@ -626,10 +654,18 @@ mod test {
     #[test]
     fn eval_match() -> ExprTestResult<()> {
         let scope = scope();
-        let mut values = eval(scope.clone(), "(match 1 [ 1 \"one\" 2 \"two\" 3 \"three\" ])")?.into_iter();
+        let mut values = eval(
+            scope.clone(),
+            "(match 1 [ 1 \"one\" 2 \"two\" 3 \"three\" ])",
+        )?
+        .into_iter();
         assert_next_value_eq!(values, Value::new_string("one"));
 
-        let mut values = eval(scope.clone(), "(match \"hello\" [ \"world\" 1 \"hello\" 2 ])")?.into_iter();
+        let mut values = eval(
+            scope.clone(),
+            "(match \"hello\" [ \"world\" 1 \"hello\" 2 ])",
+        )?
+        .into_iter();
         assert_next_value_eq!(values, Value::new_int(2));
 
         Ok(())
@@ -647,7 +683,11 @@ mod test {
     #[test]
     fn eval_match_pattern() -> ExprTestResult<()> {
         let scope = scope();
-        let mut values = eval(scope.clone(), "(match [1 2 3] [ [x y] (+ x y) [x y 1] (+ x y) [1 x y] (+ x y) ])")?.into_iter();
+        let mut values = eval(
+            scope.clone(),
+            "(match [1 2 3] [ [x y] (+ x y) [x y 1] (+ x y) [1 x y] (+ x y) ])",
+        )?
+        .into_iter();
         assert_next_value_eq!(values, Value::new_int(5));
 
         Ok(())
@@ -656,8 +696,18 @@ mod test {
     #[test]
     fn eval_match_with_list_spread() -> ExprTestResult<()> {
         let scope = scope();
-        let mut values = eval(scope.clone(), "(match [1 2 3] [ [x] (+ x 1) [x &rest] [x rest]])")?.into_iter();
-        assert_next_value_eq!(values, Value::new_list(vec![Value::new_int(1), Value::new_list(vec![Value::new_int(2), Value::new_int(3)])]));
+        let mut values = eval(
+            scope.clone(),
+            "(match [1 2 3] [ [x] (+ x 1) [x &rest] [x rest]])",
+        )?
+        .into_iter();
+        assert_next_value_eq!(
+            values,
+            Value::new_list(vec![
+                Value::new_int(1),
+                Value::new_list(vec![Value::new_int(2), Value::new_int(3)])
+            ])
+        );
 
         Ok(())
     }
@@ -741,7 +791,10 @@ mod test {
         let mut values = eval(scope.clone(), "(set-match [a &rest] [1 2 3]) a rest")?.into_iter();
         assert_next_value_eq!(values, Value::Bool(true));
         assert_next_value_eq!(values, Value::new_int(1));
-        assert_next_value_eq!(values, Value::new_list(vec![Value::new_int(2), Value::new_int(3)]));
+        assert_next_value_eq!(
+            values,
+            Value::new_list(vec![Value::new_int(2), Value::new_int(3)])
+        );
 
         Ok(())
     }

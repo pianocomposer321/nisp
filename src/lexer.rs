@@ -173,11 +173,15 @@ impl Lexer {
             self.advance()?;
             return Ok(Token::StringLiteral(string));
         }
-        if self.get_slice_until_or_end(|c| c.is_whitespace() || matches!(c, ')' | ']' | '}'))? == ['t', 'r', 'u', 'e'] {
+        if self.get_slice_until_or_end(|c| c.is_whitespace() || matches!(c, ')' | ']' | '}'))?
+            == ['t', 'r', 'u', 'e']
+        {
             self.advance_by(4)?;
             return Ok(Token::BoolLiteral(true));
         }
-        if self.get_slice_until_or_end(|c| c.is_whitespace() || matches!(c, ')' | ']' | '}'))? == ['f', 'a', 'l', 's', 'e'] {
+        if self.get_slice_until_or_end(|c| c.is_whitespace() || matches!(c, ')' | ']' | '}'))?
+            == ['f', 'a', 'l', 's', 'e']
+        {
             self.advance_by(5)?;
             return Ok(Token::BoolLiteral(false));
         }
@@ -258,7 +262,10 @@ impl Lexer {
     }
 
     fn get_line(&self) -> LexingResult<&[char]> {
-        self.input.get(self.line).map(|s| s.as_slice()).ok_or(LexingError::EOF)
+        self.input
+            .get(self.line)
+            .map(|s| s.as_slice())
+            .ok_or(LexingError::EOF)
     }
 
     fn get_char(&self) -> LexingResult<char> {
