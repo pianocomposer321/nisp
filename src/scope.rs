@@ -1,5 +1,8 @@
 use std::{
-    cell::RefCell, collections::{HashMap, HashSet}, ops::Deref, rc::Rc
+    cell::RefCell,
+    collections::{HashMap, HashSet},
+    ops::Deref,
+    rc::Rc,
 };
 
 use thiserror::Error;
@@ -179,7 +182,13 @@ impl Scope {
                             }
 
                             // left: [last-name] right: [:first-name "John"]
-                            if let Ok(_) = values.get(ind).ok_or(EvalError::PatternMatchDoesNotMatch { left: Expr::List(exprs.clone()), right: Value::List(values.clone()) })?.clone().as_marker_pair() {
+                            if ind >= values.len() {
+                                return Err(EvalError::PatternMatchDoesNotMatch {
+                                    left: Expr::List(exprs.clone()),
+                                    right: Value::List(values.clone()),
+                                });
+                            }
+                            if let Ok(_) = values[ind].clone().as_marker_pair() {
                                 return Err(EvalError::PatternMatchDoesNotMatch {
                                     right: Value::List(values),
                                     left: Expr::List(exprs),
@@ -194,13 +203,18 @@ impl Scope {
                             let mut not_in_rest = HashSet::new();
 
                             for expr in exprs.iter().skip(ind + 1) {
-                                if let Ok(name) = expr.clone().as_symbol() && let Some((value, ind)) = values.get_field_with_ind(Rc::new(name)) {
+                                if let Ok(name) = expr.clone().as_symbol()
+                                    && let Some((value, ind)) =
+                                        values.get_field_with_ind(Rc::new(name))
+                                {
                                     self.pattern_match_assign(expr.clone(), value)?;
                                     not_in_rest.insert(ind);
                                     continue;
                                 }
 
-                                if let Ok((marker, expr)) = expr.clone().as_marker_pair() && let Some((value, ind)) = values.get_field_with_ind(marker) {
+                                if let Ok((marker, expr)) = expr.clone().as_marker_pair()
+                                    && let Some((value, ind)) = values.get_field_with_ind(marker)
+                                {
                                     self.pattern_match_assign(*expr, value)?;
                                     not_in_rest.insert(ind);
                                     continue;
@@ -214,16 +228,21 @@ impl Scope {
                                 rest_values.push(value.clone());
                             }
 
-                            self.pattern_match_assign(Expr::new_symbol(&rest_name), Value::new_list(rest_values))?;
+                            self.pattern_match_assign(
+                                Expr::new_symbol(&rest_name),
+                                Value::new_list(rest_values),
+                            )?;
                             found_rest = true;
                             break;
                         }
-                        
+
                         // left: [expr] right: [value]
                         self.pattern_match_assign(expr, values[ind].clone())?;
                     }
 
-                    if (found_rest && exprs.len() > values.len() + 1) || (!found_rest && exprs.len() != values.len()) {
+                    if (found_rest && exprs.len() > values.len() + 1)
+                        || (!found_rest && exprs.len() != values.len())
+                    {
                         return Err(EvalError::PatternMatchDoesNotMatch { left, right });
                     }
 

@@ -4,7 +4,7 @@ use std::{
 };
 
 use crate::{
-    expression::{eval_block, EvalError, Expr, List},
+    expression::{EvalError, Expr, List, eval_block},
     scope::Scope,
     value::Value,
 };

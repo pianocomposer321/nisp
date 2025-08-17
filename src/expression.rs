@@ -2,7 +2,10 @@ use std::{collections::HashMap, ops::Deref, rc::Rc};
 
 use thiserror::Error;
 
-use crate::{scope::{Scope, ScopeError}, value::Value};
+use crate::{
+    scope::{Scope, ScopeError},
+    value::Value,
+};
 
 pub fn eval_block(scope: Scope, exprs: Vec<Expr>) -> Result<Value, EvalError> {
     let values = Expr::values(scope.clone(), exprs)?;
@@ -187,7 +190,11 @@ impl Expr {
     }
 
     pub fn values(scope: Scope, exprs: Vec<Expr>) -> Result<Vec<Value>, EvalError> {
-        exprs.clone().into_iter().map(|e| e.eval(scope.clone())).collect()
+        exprs
+            .clone()
+            .into_iter()
+            .map(|e| e.eval(scope.clone()))
+            .collect()
     }
 
     pub fn type_name(&self) -> String {
@@ -277,7 +284,7 @@ impl Expr {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct List {
     exprs: Vec<Expr>,
-    marker_pairs: HashMap<Rc<String>, (Expr, usize)>
+    marker_pairs: HashMap<Rc<String>, (Expr, usize)>,
 }
 
 impl Deref for List {

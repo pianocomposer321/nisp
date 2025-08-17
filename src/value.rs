@@ -154,7 +154,7 @@ impl Value {
 #[derive(Debug, PartialEq, Clone)]
 pub struct List {
     values: Vec<Value>,
-    marker_pairs: HashMap<Rc<String>, (Value, usize)>
+    marker_pairs: HashMap<Rc<String>, (Value, usize)>,
 }
 
 impl Deref for List {
@@ -182,7 +182,10 @@ impl List {
     }
 
     pub fn get_field(&self, name: Rc<String>) -> Option<Value> {
-        self.marker_pairs.get(&name).cloned().map(|(value, _)| value)
+        self.marker_pairs
+            .get(&name)
+            .cloned()
+            .map(|(value, _)| value)
     }
 
     pub fn get_field_with_ind(&self, name: Rc<String>) -> Option<(Value, usize)> {
@@ -194,7 +197,8 @@ impl List {
             self.values[*ind] = value.clone();
             self.marker_pairs.insert(name, (value.clone(), *ind));
         } else {
-            self.marker_pairs.insert(name, (value.clone(), self.values.len()));
+            self.marker_pairs
+                .insert(name, (value.clone(), self.values.len()));
             self.values.push(value.clone());
         }
     }
@@ -205,15 +209,16 @@ impl List {
         }
         self.values[ind] = value.clone();
         if let Ok((name, value)) = value.as_marker_pair() {
-            self.marker_pairs.insert(name.clone(), (*value.clone(), ind));
+            self.marker_pairs
+                .insert(name.clone(), (*value.clone(), ind));
         }
     }
 }
 
 #[cfg(test)]
 mod test {
-    use std::rc::Rc;
     use super::*;
+    use std::rc::Rc;
 
     #[test]
     fn list_get_field() {
@@ -224,8 +229,14 @@ mod test {
         ]);
 
         assert_eq!(list.get(0), Some(&Value::new_int(1)));
-        assert_eq!(list.get_field(Rc::new("key".to_string())), Some(Value::new_int(2)));
-        assert_eq!(list.get(1), Some(&Value::new_marker_pair("key", Value::new_int(2))));
+        assert_eq!(
+            list.get_field(Rc::new("key".to_string())),
+            Some(Value::new_int(2))
+        );
+        assert_eq!(
+            list.get(1),
+            Some(&Value::new_marker_pair("key", Value::new_int(2)))
+        );
         assert_eq!(list.get(2), Some(&Value::new_int(3)));
         assert!(list.marker_pairs.get(&Rc::new("key".to_string())).is_some());
     }
