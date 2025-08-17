@@ -136,3 +136,15 @@
   }
 ]) ; prints "first name: John", "last name: Doe"
 ```
+
+# Optional arguments
+
+```lisp
+(defn f [&args ?end] {
+  (print "args:" args)
+  (print "end:" end)
+})
+
+(f 1 2 3) ; prints "args: [1 2 3]", "end: nil"
+(f 1 2 3 :end "hello") ; prints "args: [1 2 3]", "end: "hello"
+```

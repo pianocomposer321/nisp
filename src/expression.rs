@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::{collections::HashMap, ops::Deref, rc::Rc};
 
 use thiserror::Error;
 
@@ -49,7 +49,7 @@ pub enum EvalError {
 pub enum Expr {
     Call(Rc<String>, Vec<Expr>),
     // TODO: this should cache marked pairs in a HashMap
-    List(Vec<Expr>),
+    List(List),
     Block(Vec<Expr>),
     Int(i64),
     Bool(bool),
@@ -94,7 +94,7 @@ impl Expr {
             Expr::Bool(b) => Ok(Value::Bool(b)),
             Expr::Block(b) => eval_block(Scope::child(scope), b),
             Expr::List(l) => {
-                let values = Expr::values(scope.clone(), l)?;
+                let values = Expr::values(scope.clone(), l.exprs)?;
                 Ok(Value::new_list(values))
             }
             Expr::MarkerPair(marker, expr) => Ok(Value::MarkerPair(
@@ -147,7 +147,7 @@ impl Expr {
     }
 
     pub fn new_list(args: Vec<Expr>) -> Self {
-        Self::List(args)
+        Self::List(List::new(args))
     }
 
     pub fn new_block(args: Vec<Expr>) -> Self {
@@ -187,7 +187,7 @@ impl Expr {
     }
 
     pub fn values(scope: Scope, exprs: Vec<Expr>) -> Result<Vec<Value>, EvalError> {
-        exprs.into_iter().map(|e| e.eval(scope.clone())).collect()
+        exprs.clone().into_iter().map(|e| e.eval(scope.clone())).collect()
     }
 
     pub fn type_name(&self) -> String {
@@ -236,7 +236,7 @@ impl Expr {
         }
     }
 
-    pub fn as_list(self) -> Result<Vec<Expr>, EvalError> {
+    pub fn as_list(self) -> Result<List, EvalError> {
         match self {
             Expr::List(l) => Ok(l),
             _ => Err(EvalError::TypeError {
@@ -271,6 +271,41 @@ impl Expr {
                 got: self.type_name(),
             }),
         }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct List {
+    exprs: Vec<Expr>,
+    marker_pairs: HashMap<Rc<String>, (Expr, usize)>
+}
+
+impl Deref for List {
+    type Target = Vec<Expr>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.exprs
+    }
+}
+
+impl List {
+    pub fn new(exprs: Vec<Expr>) -> Self {
+        let mut marker_pairs = HashMap::new();
+
+        for (ind, expr) in exprs.iter().enumerate() {
+            if let Ok((marker, expr)) = expr.clone().as_marker_pair() {
+                marker_pairs.insert(marker.clone(), (*expr.clone(), ind));
+            }
+        }
+
+        List {
+            exprs,
+            marker_pairs,
+        }
+    }
+
+    pub fn get_field(&self, name: Rc<String>) -> Option<Expr> {
+        self.marker_pairs.get(&name).cloned().map(|(expr, _)| expr)
     }
 }
 

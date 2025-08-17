@@ -1,7 +1,5 @@
 use std::{
-    cell::RefCell,
-    collections::HashMap,
-    rc::Rc,
+    cell::RefCell, collections::{HashMap, HashSet}, ops::Deref, rc::Rc
 };
 
 use thiserror::Error;
@@ -153,81 +151,80 @@ impl Scope {
                     Err(EvalError::PatternMatchDoesNotMatch { left, right })
                 }
             }
-            (Expr::List(l), r) => {
-                if let Value::List(r) = r {
-                    if l.len() > r.len() + 1 {
-                        return Err(EvalError::PatternMatchDoesNotMatch { left, right });
-                    }
-
-                    // TODO: the map and list should be stored in the Value::List type instead of
-                    // being recreated here every time
-                    let mut pairs_map = HashMap::new();
-                    let mut pairs_list = vec![None; r.len()];
-                    for (ind, value) in r.iter().enumerate() {
-                        if let Ok((marker, value)) = value.clone().as_marker_pair() {
-                            pairs_map.insert(marker, value);
-                        } else {
-                            pairs_list[ind] = Some(value.clone());
-                        }
-                    }
-
-                    let mut rest = None;
-                    let mut rest_list: Vec<Value> = Vec::new();
-                    for (ind, expr) in l.clone().into_iter().enumerate() {
+            // TODO: consider allowing pattern matching on marker pairs
+            // That would make this branch much simpler, but would change semantics
+            // of marker pairs
+            (Expr::List(exprs), values) => {
+                if let Value::List(values) = values {
+                    let mut found_rest = false;
+                    for (ind, expr) in exprs.deref().clone().into_iter().enumerate() {
+                        // left: [:marker expr] right: [:marker value]
                         if let Ok((marker, expr)) = expr.clone().as_marker_pair() {
-                            if let Some(value) = pairs_map.get(&*marker) {
-                                self.pattern_match_assign(*expr, *value.clone())?;
-                                pairs_map.remove(&*marker);
+                            if let Some(value) = values.get_field(marker.clone()) {
+                                self.pattern_match_assign(*expr, value.clone())?;
+                                continue;
                             } else {
                                 return Err(EvalError::PatternMatchDoesNotMatch {
-                                    right: Value::List(r),
-                                    left: Expr::List(l),
+                                    right: Value::List(values),
+                                    left: Expr::List(exprs),
                                 });
                             }
-                        } else if let Ok(rest_name) = expr.clone().as_rest_op() {
-                            rest = Some(rest_name);
-                            // rest_found = true;
-                            rest_list = pairs_list.iter().filter_map(|e| e.clone()).collect();
-                            // let mut rest_map: Vec<Value> = pairs_map.iter().map(|(k, v)| Value::MarkerPair(k.clone(), v.clone())).collect();
-                            // rest_list.append(&mut rest_map);
-                            // self.pattern_match_assign(Expr::new_symbol(&rest), Value::List(Rc::new(rest_list)))?;
-                        } else {
-                            if ind >= r.len() {
-                                return Err(EvalError::PatternMatchDoesNotMatch { left, right });
+                        }
+
+                        // left: [marker] right: [:marker value]
+                        if let Ok(name) = expr.clone().as_symbol() {
+                            if let Some(value) = values.get_field(Rc::new(name.clone())) {
+                                self.pattern_match_assign(Expr::new_symbol(&name), value.clone())?;
+                                continue;
                             }
 
-                            if let Ok(name) = l[ind].clone().as_symbol() {
-                                let name = Rc::new(name);
-                                if let Some(value) = pairs_map.get(&name) {
-                                    self.pattern_match_assign(expr, *value.clone())?;
-                                    pairs_map.remove(&name);
+                            // left: [last-name] right: [:first-name "John"]
+                            if let Ok(_) = values.get(ind).ok_or(EvalError::PatternMatchDoesNotMatch { left: Expr::List(exprs.clone()), right: Value::List(values.clone()) })?.clone().as_marker_pair() {
+                                return Err(EvalError::PatternMatchDoesNotMatch {
+                                    right: Value::List(values),
+                                    left: Expr::List(exprs),
+                                });
+                            }
+                        }
+
+                        // left: [&rest] right: [1 2 3]
+                        if let Ok(rest_name) = expr.clone().as_rest_op() {
+                            let mut rest_values = Vec::new();
+
+                            let mut not_in_rest = HashSet::new();
+
+                            for expr in exprs.iter().skip(ind + 1) {
+                                if let Ok(name) = expr.clone().as_symbol() && let Some((value, ind)) = values.get_field_with_ind(Rc::new(name)) {
+                                    self.pattern_match_assign(expr.clone(), value)?;
+                                    not_in_rest.insert(ind);
+                                    continue;
+                                }
+
+                                if let Ok((marker, expr)) = expr.clone().as_marker_pair() && let Some((value, ind)) = values.get_field_with_ind(marker) {
+                                    self.pattern_match_assign(*expr, value)?;
+                                    not_in_rest.insert(ind);
                                     continue;
                                 }
                             }
 
-                            if let Some(value) = pairs_list[ind].clone() {
-                                self.pattern_match_assign(expr, value)?;
-                                pairs_list[ind] = None;
-                                continue;
+                            for (ind, value) in values.iter().enumerate().skip(ind) {
+                                if not_in_rest.contains(&ind) {
+                                    continue;
+                                }
+                                rest_values.push(value.clone());
                             }
 
-                            return Err(EvalError::PatternMatchDoesNotMatch { left, right });
+                            self.pattern_match_assign(Expr::new_symbol(&rest_name), Value::new_list(rest_values))?;
+                            found_rest = true;
+                            break;
                         }
-                    }
-                    if l.len() < r.len() && rest.is_none() {
-                        return Err(EvalError::PatternMatchDoesNotMatch { left, right });
+                        
+                        // left: [expr] right: [value]
+                        self.pattern_match_assign(expr, values[ind].clone())?;
                     }
 
-                    if let Some(rest_name) = rest {
-                        let mut rest_map: Vec<Value> = pairs_map
-                            .iter()
-                            .map(|(k, v)| Value::MarkerPair(k.clone(), v.clone()))
-                            .collect();
-                        rest_list.append(&mut rest_map);
-                        self.pattern_match_assign(
-                            Expr::new_symbol(&rest_name),
-                            Value::List(Rc::new(rest_list)),
-                        )?;
+                    if (found_rest && exprs.len() > values.len() + 1) || (!found_rest && exprs.len() != values.len()) {
+                        return Err(EvalError::PatternMatchDoesNotMatch { left, right });
                     }
 
                     Ok(())

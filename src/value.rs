@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::{collections::HashMap, ops::Deref, rc::Rc};
 
 use crate::{callable::FunctionDefn, expression::EvalError};
 
@@ -8,7 +8,7 @@ pub enum Value {
     String(Rc<String>),
     FunctionDefn(Rc<FunctionDefn>),
     Bool(bool),
-    List(Rc<Vec<Value>>),
+    List(Rc<List>),
     MarkerPair(Rc<String>, Box<Value>),
     Unit,
 }
@@ -67,7 +67,7 @@ impl Value {
     }
 
     pub fn new_list(l: Vec<Value>) -> Self {
-        Value::List(Rc::new(l))
+        Value::List(Rc::new(List::new(l)))
     }
 
     pub fn new_marker_pair(marker: impl Into<String>, value: Value) -> Self {
@@ -128,7 +128,7 @@ impl Value {
         }
     }
 
-    pub fn as_list(self) -> Result<Rc<Vec<Value>>, EvalError> {
+    pub fn as_list(self) -> Result<Rc<List>, EvalError> {
         match self {
             Value::List(l) => Ok(l),
             _ => Err(EvalError::TypeError {
@@ -148,5 +148,85 @@ impl Value {
             Value::MarkerPair(_, _) => "MarkerPair".to_string(),
             Value::Unit => "Unit".to_string(),
         }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct List {
+    values: Vec<Value>,
+    marker_pairs: HashMap<Rc<String>, (Value, usize)>
+}
+
+impl Deref for List {
+    type Target = Vec<Value>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.values
+    }
+}
+
+impl List {
+    pub fn new(values: Vec<Value>) -> Self {
+        let mut marker_pairs = HashMap::new();
+
+        for (ind, value) in values.iter().enumerate() {
+            if let Value::MarkerPair(marker, value) = value {
+                marker_pairs.insert(marker.clone(), (*value.clone(), ind));
+            }
+        }
+
+        List {
+            values,
+            marker_pairs,
+        }
+    }
+
+    pub fn get_field(&self, name: Rc<String>) -> Option<Value> {
+        self.marker_pairs.get(&name).cloned().map(|(value, _)| value)
+    }
+
+    pub fn get_field_with_ind(&self, name: Rc<String>) -> Option<(Value, usize)> {
+        self.marker_pairs.get(&name).cloned()
+    }
+
+    pub fn set_field(&mut self, name: Rc<String>, value: Value) {
+        if let Some((_, ind)) = self.marker_pairs.get(&name) {
+            self.values[*ind] = value.clone();
+            self.marker_pairs.insert(name, (value.clone(), *ind));
+        } else {
+            self.marker_pairs.insert(name, (value.clone(), self.values.len()));
+            self.values.push(value.clone());
+        }
+    }
+
+    pub fn set(&mut self, ind: usize, value: Value) {
+        if let Ok((name, _)) = self.values[ind].clone().as_marker_pair() {
+            self.marker_pairs.remove(&name);
+        }
+        self.values[ind] = value.clone();
+        if let Ok((name, value)) = value.as_marker_pair() {
+            self.marker_pairs.insert(name.clone(), (*value.clone(), ind));
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::rc::Rc;
+    use super::*;
+
+    #[test]
+    fn list_get_field() {
+        let list = List::new(vec![
+            Value::new_int(1),
+            Value::new_marker_pair("key", Value::new_int(2)),
+            Value::new_int(3),
+        ]);
+
+        assert_eq!(list.get(0), Some(&Value::new_int(1)));
+        assert_eq!(list.get_field(Rc::new("key".to_string())), Some(Value::new_int(2)));
+        assert_eq!(list.get(1), Some(&Value::new_marker_pair("key", Value::new_int(2))));
+        assert_eq!(list.get(2), Some(&Value::new_int(3)));
+        assert!(list.marker_pairs.get(&Rc::new("key".to_string())).is_some());
     }
 }

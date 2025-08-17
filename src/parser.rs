@@ -97,7 +97,7 @@ impl Parser {
                 self.advance();
                 if self.get_token()? == Token::CloseBracket {
                     self.advance();
-                    Ok(Expr::List(vec![]))
+                    Ok(Expr::new_list(vec![]))
                 } else {
                     let mut exprs = Vec::new();
                     let mut parser = Parser::from(self);
@@ -106,7 +106,7 @@ impl Parser {
                         exprs.push(expr);
                     }
                     self.position = parser.position;
-                    Ok(Expr::List(exprs))
+                    Ok(Expr::new_list(exprs))
                 }
             }
             Token::OpenBrace => {
@@ -235,7 +235,7 @@ mod test {
     #[test]
     fn parse_empty_list() -> ParsingResult<()> {
         let mut p = parse("[]");
-        assert_next_expr_eq!(p, Expr::List(vec![]));
+        assert_next_expr_eq!(p, Expr::new_list(vec![]));
 
         Ok(())
     }
@@ -245,7 +245,7 @@ mod test {
         let mut p = parse("[1 2 3]");
         assert_next_expr_eq!(
             p,
-            Expr::List(vec![Expr::Int(1), Expr::Int(2), Expr::Int(3)])
+            Expr::new_list(vec![Expr::Int(1), Expr::Int(2), Expr::Int(3)])
         );
 
         Ok(())
@@ -297,7 +297,7 @@ mod test {
             Expr::new_call(
                 "foo",
                 vec![
-                    Expr::List(vec![
+                    Expr::new_list(vec![
                         Expr::new_symbol("bar"),
                         Expr::new_call("baz", vec![Expr::Int(123), Expr::new_string("hello")]),
                         Expr::new_symbol("qux"),

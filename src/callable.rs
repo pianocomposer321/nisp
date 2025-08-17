@@ -4,7 +4,7 @@ use std::{
 };
 
 use crate::{
-    expression::{EvalError, Expr, eval_block},
+    expression::{eval_block, EvalError, Expr, List},
     scope::Scope,
     value::Value,
 };
@@ -87,7 +87,7 @@ impl FunctionDefn {
         }
     }
 
-    pub fn args(&self) -> Result<Vec<Expr>, EvalError> {
+    pub fn args(&self) -> Result<List, EvalError> {
         self.args.clone().as_list()
     }
 
