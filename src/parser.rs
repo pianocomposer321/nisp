@@ -108,7 +108,10 @@ impl Parser {
                         if let Ok(Token::Pipe) = parser.get_token() {
                             parser.advance();
                             let next_token = parser.get_token()?;
-                            let tail = parser.parse_next_expr()?.as_symbol().map_err(|_| ParsingError::UnexpectedToken(next_token))?;
+                            let tail = parser
+                                .parse_next_expr()?
+                                .as_symbol()
+                                .map_err(|_| ParsingError::UnexpectedToken(next_token))?;
                             exprs.push(Expr::ListTail(Rc::new(tail)));
 
                             let next_token = parser.get_token()?;

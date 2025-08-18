@@ -839,7 +839,10 @@ mod test {
         assert_next_value_eq!(values, Value::new_int(1));
 
         let scope = make_scope();
-        let values = eval(scope.clone(), "(set [:first-name first-name] [:last-name \"Doe\"])");
+        let values = eval(
+            scope.clone(),
+            "(set [:first-name first-name] [:last-name \"Doe\"])",
+        );
         assert!(matches!(
             values.unwrap_err(),
             ExprTestError::EvalError(EvalError::PatternMatchDoesNotMatch { .. })
@@ -910,27 +913,35 @@ mod test {
         let mut values = eval(
             scope.clone(),
             "(set [x y | opts] [1 2 :opt1 \"value1\" :opt2 \"value2\"]) x y opts",
-        )?.into_iter();
+        )?
+        .into_iter();
         assert_next_value_eq!(values, Value::Unit);
         assert_next_value_eq!(values, Value::new_int(1));
         assert_next_value_eq!(values, Value::new_int(2));
-        assert_next_value_eq!(values, Value::new_list(vec![
-            Value::new_marker_pair("opt1", Value::new_string("value1")),
-            Value::new_marker_pair("opt2", Value::new_string("value2")),
-        ]));
+        assert_next_value_eq!(
+            values,
+            Value::new_list(vec![
+                Value::new_marker_pair("opt1", Value::new_string("value1")),
+                Value::new_marker_pair("opt2", Value::new_string("value2")),
+            ])
+        );
 
         let scope = make_scope();
         let mut values = eval(
             scope.clone(),
             "(set [x y | opts] [:y 1 :x 2 :opt1 \"value1\" :opt2 \"value2\"]) x y opts",
-        )?.into_iter();
+        )?
+        .into_iter();
         assert_next_value_eq!(values, Value::Unit);
         assert_next_value_eq!(values, Value::new_int(2));
         assert_next_value_eq!(values, Value::new_int(1));
-        assert_next_value_eq!(values, Value::new_list(vec![
-            Value::new_marker_pair("opt1", Value::new_string("value1")),
-            Value::new_marker_pair("opt2", Value::new_string("value2")),
-        ]));
+        assert_next_value_eq!(
+            values,
+            Value::new_list(vec![
+                Value::new_marker_pair("opt1", Value::new_string("value1")),
+                Value::new_marker_pair("opt2", Value::new_string("value2")),
+            ])
+        );
 
         Ok(())
     }
