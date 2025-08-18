@@ -58,9 +58,9 @@ pub enum Expr {
     Bool(bool),
     String(Rc<String>),
     Symbol(Rc<String>),
-    SpreadOp(Rc<String>),
     MarkerPair(Rc<String>, Box<Expr>),
     DotOp(Box<Expr>, Box<Expr>),
+    ListTail(Rc<String>),
     Unit,
 }
 
@@ -173,8 +173,8 @@ impl Expr {
         Self::Symbol(Rc::new(s.to_string()))
     }
 
-    pub fn new_spread_op(s: &str) -> Self {
-        Self::SpreadOp(Rc::new(s.to_string()))
+    pub fn new_list_tail(s: &str) -> Self {
+        Self::ListTail(Rc::new(s.to_string()))
     }
 
     pub fn new_unit() -> Self {
@@ -206,7 +206,7 @@ impl Expr {
             Expr::Block(_) => "Block".to_string(),
             Expr::Symbol(_) => "Symbol".to_string(),
             Expr::Bool(_) => "Bool".to_string(),
-            Expr::SpreadOp(_) => "RestOp".to_string(),
+            Expr::ListTail(_) => "ListTail".to_string(),
             Expr::MarkerPair(_, _) => "MarkerPair".to_string(),
             Expr::DotOp(_, _) => "DotOp".to_string(),
             Expr::Unit => "Unit".to_string(),
@@ -260,11 +260,11 @@ impl Expr {
         }
     }
 
-    pub fn as_rest_op(self) -> Result<String, EvalError> {
+    pub fn as_list_tail(self) -> Result<Rc<String>, EvalError> {
         match self {
-            Expr::SpreadOp(s) => Ok(nisp::unwrap_rc(s, |rc| rc.to_string())),
+            Expr::ListTail(s) => Ok(s),
             _ => Err(EvalError::TypeError {
-                expected: "RestOp".to_string(),
+                expected: "ListTail".to_string(),
                 got: self.type_name(),
             }),
         }
@@ -684,11 +684,11 @@ mod test {
     }
 
     #[test]
-    fn eval_match_with_list_spread() -> ExprTestResult<()> {
+    fn eval_match_with_tail() -> ExprTestResult<()> {
         let scope = make_scope();
         let mut values = eval(
             scope.clone(),
-            "(match [1 2 3] [ [x] (+ x 1) [x &rest] [x rest]])",
+            "(match [1 2 3] [ [x] (+ x 1) [x | tail] [x tail]])",
         )?
         .into_iter();
         assert_next_value_eq!(
@@ -778,7 +778,7 @@ mod test {
         let mut values = eval(scope.clone(), "(set-match [a b c] [1 2])")?.into_iter();
         assert_next_value_eq!(values, Value::Bool(false));
 
-        let mut values = eval(scope.clone(), "(set-match [a &rest] [1 2 3]) a rest")?.into_iter();
+        let mut values = eval(scope.clone(), "(set-match [a | tail] [1 2 3]) a tail")?.into_iter();
         assert_next_value_eq!(values, Value::Bool(true));
         assert_next_value_eq!(values, Value::new_int(1));
         assert_next_value_eq!(
@@ -839,7 +839,7 @@ mod test {
         assert_next_value_eq!(values, Value::new_int(1));
 
         let scope = make_scope();
-        let values = eval(scope.clone(), "(set [first-name] [:last-name \"Doe\"])");
+        let values = eval(scope.clone(), "(set [:first-name first-name] [:last-name \"Doe\"])");
         assert!(matches!(
             values.unwrap_err(),
             ExprTestError::EvalError(EvalError::PatternMatchDoesNotMatch { .. })
@@ -859,28 +859,6 @@ mod test {
         assert_next_value_eq!(values, Value::Unit);
         assert_next_value_eq!(values, Value::new_int(2));
         assert_next_value_eq!(values, Value::new_int(1));
-
-        Ok(())
-    }
-
-    #[test]
-    fn eval_kwargs() -> ExprTestResult<()> {
-        let scope = make_scope();
-        let mut values = eval(
-            scope.clone(),
-            "(set [&args end] [1 2 3 :end \"hello\"]) args end",
-        )?
-        .into_iter();
-        assert_next_value_eq!(values, Value::Unit);
-        assert_next_value_eq!(
-            values,
-            Value::new_list(vec![
-                Value::new_int(1),
-                Value::new_int(2),
-                Value::new_int(3)
-            ])
-        );
-        assert_next_value_eq!(values, Value::new_string("hello"));
 
         Ok(())
     }
@@ -922,6 +900,37 @@ mod test {
                 index: 3
             })
         ));
+
+        Ok(())
+    }
+
+    #[test]
+    fn eval_kwargs() -> ExprTestResult<()> {
+        let scope = make_scope();
+        let mut values = eval(
+            scope.clone(),
+            "(set [x y | opts] [1 2 :opt1 \"value1\" :opt2 \"value2\"]) x y opts",
+        )?.into_iter();
+        assert_next_value_eq!(values, Value::Unit);
+        assert_next_value_eq!(values, Value::new_int(1));
+        assert_next_value_eq!(values, Value::new_int(2));
+        assert_next_value_eq!(values, Value::new_list(vec![
+            Value::new_marker_pair("opt1", Value::new_string("value1")),
+            Value::new_marker_pair("opt2", Value::new_string("value2")),
+        ]));
+
+        let scope = make_scope();
+        let mut values = eval(
+            scope.clone(),
+            "(set [x y | opts] [:y 1 :x 2 :opt1 \"value1\" :opt2 \"value2\"]) x y opts",
+        )?.into_iter();
+        assert_next_value_eq!(values, Value::Unit);
+        assert_next_value_eq!(values, Value::new_int(2));
+        assert_next_value_eq!(values, Value::new_int(1));
+        assert_next_value_eq!(values, Value::new_list(vec![
+            Value::new_marker_pair("opt1", Value::new_string("value1")),
+            Value::new_marker_pair("opt2", Value::new_string("value2")),
+        ]));
 
         Ok(())
     }

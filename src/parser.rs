@@ -104,6 +104,18 @@ impl Parser {
 
                     while let Ok(expr) = parser.parse_next_expr() {
                         exprs.push(expr);
+
+                        if let Ok(Token::Pipe) = parser.get_token() {
+                            parser.advance();
+                            let next_token = parser.get_token()?;
+                            let tail = parser.parse_next_expr()?.as_symbol().map_err(|_| ParsingError::UnexpectedToken(next_token))?;
+                            exprs.push(Expr::ListTail(Rc::new(tail)));
+
+                            let next_token = parser.get_token()?;
+                            if next_token != Token::CloseBracket {
+                                return Err(ParsingError::UnexpectedToken(next_token));
+                            }
+                        }
                     }
                     self.position = parser.position;
                     Ok(Expr::new_list(exprs))
@@ -129,16 +141,6 @@ impl Parser {
             Token::BoolLiteral(b) => {
                 self.advance();
                 Ok(Expr::Bool(b))
-            }
-            Token::SpreadOp => {
-                self.advance();
-                let next_token = self.get_token()?;
-                if let Token::Symbol(s) = next_token {
-                    self.advance();
-                    Ok(Expr::SpreadOp(Rc::new(s)))
-                } else {
-                    Err(ParsingError::UnexpectedToken(next_token))
-                }
             }
             Token::Marker(marker) => {
                 self.advance();
@@ -376,14 +378,6 @@ mod test {
     }
 
     #[test]
-    fn parse_spread_operator() -> ParsingResult<()> {
-        let mut p = parse("&rest");
-        assert_next_expr_eq!(p, Expr::new_spread_op("rest"));
-
-        Ok(())
-    }
-
-    #[test]
     fn parse_list_with_marker() -> ParsingResult<()> {
         let mut p = parse("[:key 123]");
         assert_next_expr_eq!(
@@ -409,6 +403,21 @@ mod test {
         assert_next_expr_eq!(
             p,
             Expr::new_dot_op(Expr::Symbol(Rc::new("a".to_string())), Expr::Int(1))
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn parse_list_with_tail() -> ParsingResult<()> {
+        let mut p = parse("[a b | tail]");
+        assert_next_expr_eq!(
+            p,
+            Expr::new_list(vec![
+                Expr::new_symbol("a"),
+                Expr::new_symbol("b"),
+                Expr::new_list_tail("tail"),
+            ])
         );
 
         Ok(())

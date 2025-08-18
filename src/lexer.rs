@@ -54,10 +54,10 @@ pub enum Token {
     StringLiteral(String),
     /// true, false
     BoolLiteral(bool),
-    /// &rest
-    SpreadOp,
     /// :marker
     Marker(String),
+    /// |
+    Pipe,
     /// .
     Dot,
 }
@@ -78,7 +78,7 @@ impl Token {
             Token::IntLiteral(_) => "IntLiteral".to_string(),
             Token::StringLiteral(_) => "StringLiteral".to_string(),
             Token::BoolLiteral(_) => "BoolLiteral".to_string(),
-            Token::SpreadOp => "SpreadOp".to_string(),
+            Token::Pipe => "Pipe".to_string(),
             Token::Marker(_) => "Marker".to_string(),
             Token::OpenParen => "OpenParen".to_string(),
             Token::CloseParen => "CloseParen".to_string(),
@@ -179,9 +179,9 @@ impl Lexer {
             self.advance()?;
             return Ok(Token::CloseBrace);
         }
-        if ch == '&' {
+        if ch == '|' {
             self.advance()?;
-            return Ok(Token::SpreadOp);
+            return Ok(Token::Pipe);
         }
         if ch == '-' {
             self.advance()?;
@@ -629,28 +629,6 @@ mod test {
     }
 
     #[test]
-    fn lex_rest_operator() -> LexingResult<()> {
-        let mut l = lex("&rest");
-        assert_next_token_eq!(&mut l, Token::SpreadOp);
-        assert_next_token_eq!(&mut l, Token::Symbol("rest".to_string()));
-        assert_eof!(&mut l);
-
-        Ok(())
-    }
-
-    #[test]
-    fn lex_rest_operator_in_list() -> LexingResult<()> {
-        let mut l = lex("[&rest]");
-        assert_next_token_eq!(&mut l, Token::OpenBracket);
-        assert_next_token_eq!(&mut l, Token::SpreadOp);
-        assert_next_token_eq!(&mut l, Token::Symbol("rest".to_string()));
-        assert_next_token_eq!(&mut l, Token::CloseBracket);
-        assert_eof!(&mut l);
-
-        Ok(())
-    }
-
-    #[test]
     fn lex_marker() -> LexingResult<()> {
         let mut l = lex(":marker");
         assert_next_token_eq!(&mut l, Token::Marker("marker".to_string()));
@@ -675,6 +653,29 @@ mod test {
         assert_next_token_eq!(&mut l, Token::Symbol("a".to_string()));
         assert_next_token_eq!(&mut l, Token::Dot);
         assert_next_token_eq!(&mut l, Token::IntLiteral(1));
+        assert_eof!(&mut l);
+
+        Ok(())
+    }
+
+    #[test]
+    fn lex_pipe() -> LexingResult<()> {
+        let mut l = lex("|");
+        assert_next_token_eq!(&mut l, Token::Pipe);
+        assert_eof!(&mut l);
+
+        Ok(())
+    }
+
+    #[test]
+    fn lex_pipe_in_list() -> LexingResult<()> {
+        let mut l = lex("[a b | tail]");
+        assert_next_token_eq!(&mut l, Token::OpenBracket);
+        assert_next_token_eq!(&mut l, Token::Symbol("a".to_string()));
+        assert_next_token_eq!(&mut l, Token::Symbol("b".to_string()));
+        assert_next_token_eq!(&mut l, Token::Pipe);
+        assert_next_token_eq!(&mut l, Token::Symbol("tail".to_string()));
+        assert_next_token_eq!(&mut l, Token::CloseBracket);
         assert_eof!(&mut l);
 
         Ok(())
