@@ -152,6 +152,8 @@ impl Value {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+// TODO: Maybe this could just be a Vec<Value> instead of a dedicated type?
+// Then for pattern matching the rhs would still be an expression
 pub struct List {
     values: Vec<Value>,
     marker_pairs: HashMap<Rc<String>, (Value, usize)>,

@@ -188,7 +188,33 @@ impl Scope {
                     };
 
                     if let Some((lookup_name, set_name)) = pair {
-                        if let Some(value) = values.get_field(lookup_name) {
+                        if let Some((value, ind)) = values.get_field_with_ind(lookup_name) {
+                            if exprs.has_tail() {
+                                if ind > values.len() - 2 {
+                                    // This means we are in a situation like this:
+                                    //
+                                    // (set [x y | tail] [:y 1 :opt1 "value1" :x 2]) x y tail
+                                    //                                        ^
+                                    // So the tail would have the value :x 2, which is likely
+                                    // unexpected (since :x matches the first value in the
+                                    // list). We probably want tail to have the :opt1 value
+                                    // instead, but tail is always matched by position. The
+                                    // simplest way to handle this is to error in this case.
+                                    // 
+                                    // Essentially: if there is a tail and there are N bindings
+                                    // before the tail in the pattern expression, then the first N
+                                    // values in the rhs must be matched by those N bindings, not
+                                    // by the tail. In the example, there are 2 bindings before the
+                                    // tail, but :opt1 is not matched by either of them. Therefore,
+                                    // this is an error.
+
+                                    return Err(EvalError::PatternMatchDoesNotMatch {
+                                        left: Expr::List(exprs.clone()),
+                                        right: value.clone(),
+                                    });
+                                }
+                            }
+
                             self.pattern_match_assign(set_name, value.clone())?;
                             continue;
                         }

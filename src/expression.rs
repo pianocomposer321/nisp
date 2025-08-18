@@ -285,6 +285,7 @@ impl Expr {
 pub struct List {
     exprs: Vec<Expr>,
     marker_pairs: HashMap<Rc<String>, (Expr, usize)>,
+    has_tail: bool,
 }
 
 impl Deref for List {
@@ -298,21 +299,31 @@ impl Deref for List {
 impl List {
     pub fn new(exprs: Vec<Expr>) -> Self {
         let mut marker_pairs = HashMap::new();
+        let mut has_tail = false;
 
         for (ind, expr) in exprs.iter().enumerate() {
             if let Ok((marker, expr)) = expr.clone().as_marker_pair() {
                 marker_pairs.insert(marker.clone(), (*expr.clone(), ind));
+            }
+
+            if expr.clone().as_list_tail().is_ok() {
+                has_tail = true;
             }
         }
 
         List {
             exprs,
             marker_pairs,
+            has_tail,
         }
     }
 
     pub fn get_field(&self, name: Rc<String>) -> Option<Expr> {
         self.marker_pairs.get(&name).cloned().map(|(expr, _)| expr)
+    }
+
+    pub fn has_tail(&self) -> bool {
+        self.has_tail
     }
 }
 
@@ -942,6 +953,17 @@ mod test {
                 Value::new_marker_pair("opt2", Value::new_string("value2")),
             ])
         );
+
+        let scope = make_scope();
+        let values = eval(
+            scope.clone(),
+            "(set [x y | tail] [:y 1 :opt1 \"value1\" :x 2]) x y tail",
+        );
+        dbg!(&values);
+        assert!(matches!(
+            values.unwrap_err(),
+            ExprTestError::EvalError(EvalError::PatternMatchDoesNotMatch { .. })
+        ));
 
         Ok(())
     }
