@@ -4,6 +4,8 @@ pub mod lexer;
 pub mod parser;
 pub mod scope;
 pub mod value;
+pub mod compiler;
+pub mod vm;
 
 use std::io;
 
