@@ -7,7 +7,7 @@ use thiserror::Error;
 #[derive(Debug, PartialEq)]
 enum Op {
     Push(vm::Val),
-    Add,
+    Add(usize),
     Eq,
 }
 
@@ -39,9 +39,11 @@ impl Compiler {
     fn try_compile_builtin(name: &str, args: &Vec<expression::Expr>) -> CompileResult<Vec<Op>> {
         match name {
             "+" => {
-                let mut ops = Self::compile_expr(&args[0])?;
-                ops.extend(Self::compile_expr(&args[1])?);
-                ops.push(Op::Add);
+                let mut ops = Vec::new();
+                for arg in args {
+                    ops.extend(Self::compile_expr(arg)?)
+                }
+                ops.push(Op::Add(args.len()));
                 Ok(ops)
             },
             "=" => {
@@ -141,7 +143,14 @@ mod test {
         let mut res = compiler.compile_all()?.into_iter();
         assert_next_op_eq!(res, Op::Push(vm::Val::Int(1)));
         assert_next_op_eq!(res, Op::Push(vm::Val::Int(2)));
-        assert_next_op_eq!(res, Op::Add);
+        assert_next_op_eq!(res, Op::Add(2));
+
+        let mut compiler = make_compiler("(+ 1 2 3)")?;
+        let mut res = compiler.compile_all()?.into_iter();
+        assert_next_op_eq!(res, Op::Push(vm::Val::Int(1)));
+        assert_next_op_eq!(res, Op::Push(vm::Val::Int(2)));
+        assert_next_op_eq!(res, Op::Push(vm::Val::Int(3)));
+        assert_next_op_eq!(res, Op::Add(3));
 
         Ok(())
     }
