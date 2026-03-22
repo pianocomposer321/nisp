@@ -4,13 +4,6 @@ use crate::{expression, lexer, parser, vm};
 
 use thiserror::Error;
 
-#[derive(Debug, PartialEq)]
-enum Op {
-    Push(vm::Val),
-    Add(usize),
-    Eq,
-}
-
 #[derive(Error, Debug)]
 enum CompileError {
     #[error("Unrecognized builtin: {0}")]
@@ -36,33 +29,33 @@ impl Compiler {
         }
     }
 
-    fn try_compile_builtin(name: &str, args: &Vec<expression::Expr>) -> CompileResult<Vec<Op>> {
+    fn try_compile_builtin(name: &str, args: &Vec<expression::Expr>) -> CompileResult<Vec<vm::Op>> {
         match name {
             "+" => {
                 let mut ops = Vec::new();
                 for arg in args {
                     ops.extend(Self::compile_expr(arg)?)
                 }
-                ops.push(Op::Add(args.len()));
+                ops.push(vm::Op::Add(args.len()));
                 Ok(ops)
             },
             "=" => {
                 let mut ops = Self::compile_expr(&args[0])?;
                 ops.extend(Self::compile_expr(&args[1])?);
-                ops.push(Op::Eq);
+                ops.push(vm::Op::Eq);
                 Ok(ops)
             },
             other => Err(CompileError::UnrecognizedBuiltin(other.to_string())),
         }
     }
 
-    pub fn compile_expr(expr: &expression::Expr) -> CompileResult<Vec<Op>> {
+    pub fn compile_expr(expr: &expression::Expr) -> CompileResult<Vec<vm::Op>> {
         match expr {
             expression::Expr::Call(name, exprs) => Self::try_compile_builtin(name, exprs),
             expression::Expr::List(list) => todo!(),
             expression::Expr::Block(exprs) => todo!(),
-            expression::Expr::Int(inner) => Ok(vec![Op::Push(vm::Val::Int(*inner))]),
-            expression::Expr::Bool(inner) => Ok(vec![Op::Push(vm::Val::Bool(*inner))]),
+            expression::Expr::Int(inner) => Ok(vec![vm::Op::Push(vm::Val::Int(*inner))]),
+            expression::Expr::Bool(inner) => Ok(vec![vm::Op::Push(vm::Val::Bool(*inner))]),
             expression::Expr::String(_) => todo!(),
             expression::Expr::Symbol(_) => todo!(),
             expression::Expr::MarkerPair(_, expr) => todo!(),
@@ -72,13 +65,13 @@ impl Compiler {
         }
     }
 
-    pub fn compile_next_expr(&mut self) -> CompileResult<Vec<Op>> {
+    pub fn compile_next_expr(&mut self) -> CompileResult<Vec<vm::Op>> {
         let ops = Self::compile_expr(&self.ast[self.cursor].clone())?;
         self.cursor += 1;
         Ok(ops)
     }
 
-    pub fn compile_all(mut self) -> CompileResult<Vec<Op>> {
+    pub fn compile_all(mut self) -> CompileResult<Vec<vm::Op>> {
         let mut ops = Vec::new();
         for expr in self.ast.iter().cloned() {
             ops.extend(Self::compile_expr(&expr)?);
@@ -122,7 +115,7 @@ mod test {
         let mut compiler = make_compiler("123")?;
         let res = compiler.compile_next_expr()?;
         dbg!(&res);
-        assert!(matches!(res[0], Op::Push(vm::Val::Int(123))));
+        assert!(matches!(res[0], vm::Op::Push(vm::Val::Int(123))));
 
         Ok(())
     }
@@ -132,7 +125,7 @@ mod test {
         let mut compiler = make_compiler("true")?;
         let res = compiler.compile_next_expr()?;
         dbg!(&res);
-        assert!(matches!(res[0], Op::Push(vm::Val::Bool(true))));
+        assert!(matches!(res[0], vm::Op::Push(vm::Val::Bool(true))));
 
         Ok(())
     }
@@ -141,16 +134,16 @@ mod test {
     fn add() -> CompileTestResult<()> {
         let mut compiler = make_compiler("(+ 1 2)")?;
         let mut res = compiler.compile_all()?.into_iter();
-        assert_next_op_eq!(res, Op::Push(vm::Val::Int(1)));
-        assert_next_op_eq!(res, Op::Push(vm::Val::Int(2)));
-        assert_next_op_eq!(res, Op::Add(2));
+        assert_next_op_eq!(res, vm::Op::Push(vm::Val::Int(1)));
+        assert_next_op_eq!(res, vm::Op::Push(vm::Val::Int(2)));
+        assert_next_op_eq!(res, vm::Op::Add(2));
 
         let mut compiler = make_compiler("(+ 1 2 3)")?;
         let mut res = compiler.compile_all()?.into_iter();
-        assert_next_op_eq!(res, Op::Push(vm::Val::Int(1)));
-        assert_next_op_eq!(res, Op::Push(vm::Val::Int(2)));
-        assert_next_op_eq!(res, Op::Push(vm::Val::Int(3)));
-        assert_next_op_eq!(res, Op::Add(3));
+        assert_next_op_eq!(res, vm::Op::Push(vm::Val::Int(1)));
+        assert_next_op_eq!(res, vm::Op::Push(vm::Val::Int(2)));
+        assert_next_op_eq!(res, vm::Op::Push(vm::Val::Int(3)));
+        assert_next_op_eq!(res, vm::Op::Add(3));
 
         Ok(())
     }
@@ -160,9 +153,9 @@ mod test {
         let mut compiler = make_compiler("(= 1 2)")?;
         let mut res = compiler.compile_all()?.into_iter();
         dbg!(&res);
-        assert_next_op_eq!(res, Op::Push(vm::Val::Int(1)));
-        assert_next_op_eq!(res, Op::Push(vm::Val::Int(2)));
-        assert_next_op_eq!(res, Op::Eq);
+        assert_next_op_eq!(res, vm::Op::Push(vm::Val::Int(1)));
+        assert_next_op_eq!(res, vm::Op::Push(vm::Val::Int(2)));
+        assert_next_op_eq!(res, vm::Op::Eq);
 
         Ok(())
     }
